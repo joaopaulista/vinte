@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Check, Loader2, Sparkles, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Check, Loader2, Sparkles, X } from 'lucide-react';
 import { CategoryPicker } from '@/components/categories/CategoryPicker';
+import { DescriptionLabel } from '@/components/transactions/DescriptionLabel';
 import { formatCurrency, formatDate } from '@/utils/format';
 import type { CategoryTree, TransactionWithRelations } from '@/types';
 
@@ -47,24 +48,43 @@ export function ReconciliationCard({
 
   return (
     <article className="card p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-ink">
-            {transaction.description ?? 'Sem descrição'}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base">
+            <DescriptionLabel description={transaction.description} />
           </h3>
-          <p className="mt-0.5 text-sm text-ink-2">
-            {formatDate(transaction.transaction_date)}
-            {transaction.account?.name ? ` · ${transaction.account.name}` : ''}
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                isIncome ? 'bg-success-surface text-success-ink' : 'bg-surface-2 text-ink-2'
+              }`}
+            >
+              {isIncome ? (
+                <ArrowDownLeft className="h-3 w-3" aria-hidden />
+              ) : (
+                <ArrowUpRight className="h-3 w-3" aria-hidden />
+              )}
+              {isIncome ? 'Entrada' : 'Saída'}
+            </span>
+            <span className="tabular-nums">{formatDate(transaction.transaction_date)}</span>
+            {transaction.account?.name && (
+              <>
+                <span className="text-ink-3" aria-hidden>
+                  ·
+                </span>
+                <span className="truncate">{transaction.account.name}</span>
+              </>
+            )}
           </p>
           {transaction.auto_categorized && (
-            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-info-surface px-2 py-0.5 text-xs font-medium text-info-ink">
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-info-surface px-2 py-0.5 text-xs font-medium text-info-ink">
               <Sparkles className="h-3 w-3" aria-hidden />
               Categoria sugerida — confira antes de aprovar
             </p>
           )}
         </div>
         <span
-          className={`text-lg font-semibold tabular-nums ${
+          className={`shrink-0 text-lg font-semibold whitespace-nowrap tabular-nums ${
             isIncome ? 'text-success-ink' : 'text-ink'
           }`}
         >

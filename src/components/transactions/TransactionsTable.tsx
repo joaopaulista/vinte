@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { DescriptionLabel } from './DescriptionLabel';
 import { formatCurrency, formatDate } from '@/utils/format';
 import type { TransactionWithRelations } from '@/types';
 
@@ -29,10 +30,8 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
               <td className="px-4 py-3 whitespace-nowrap text-ink-2 tabular-nums">
                 {formatDate(transaction.transaction_date)}
               </td>
-              <td className="px-4 py-3">
-                <p className="font-medium text-ink">
-                  {transaction.description ?? 'Sem descrição'}
-                </p>
+              <td className="max-w-md px-4 py-3">
+                <DescriptionLabel description={transaction.description} />
                 {transaction.account?.name && (
                   <p className="text-xs text-ink-3">{transaction.account.name}</p>
                 )}
