@@ -1,11 +1,16 @@
+# Atualizações de rotina desligadas (open-pull-requests-limit: 0): o projeto
+# trabalha direto na main, sem PRs. Para receber só alertas de falhas de
+# segurança nas dependências, ative "Dependabot alerts" em
+# Settings → Code security no GitHub — alerta não abre PR.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
