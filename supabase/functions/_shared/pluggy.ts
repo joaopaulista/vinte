@@ -28,7 +28,8 @@ export interface PluggyTransaction {
   date: string;
   type: 'DEBIT' | 'CREDIT';
   /** PENDING ainda pode mudar de valor ou sumir; POSTED está liquidada. */
-  status?: 'PENDING' | 'POSTED';
+  status?: 'PENDING' | 'POSTED';  /** Categoria do próprio Pluggy (em inglês), ex.: "Credit card payment". */
+  category?: string | null;
 }
 
 export interface PluggyItem {

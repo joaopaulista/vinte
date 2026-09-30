@@ -3,8 +3,6 @@ import type { FormEvent, ReactNode } from 'react';
 import { Check, ChevronRight, Loader2, Lock, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/hooks/useCategories';
-import { usePagination } from '@/hooks/usePagination';
-import { Pagination } from '@/components/common/Pagination';
 import { DeleteCategoryDialog } from './DeleteCategoryDialog';
 import {
   createCategory,
@@ -33,7 +31,8 @@ export function CategoryManager() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const pagination = usePagination(tree, 10);
+  // Regra: precisa sobrar pelo menos 1 categoria (o banco também garante).
+  const ownCategoryCount = tree.filter((category) => category.user_id !== null).length;
   const [deleting, setDeleting] = useState<Category | null>(null);
 
   async function run(action: () => Promise<unknown>): Promise<boolean> {
@@ -118,7 +117,7 @@ export function CategoryManager() {
         <p className="mt-4 text-sm text-ink-3">Nenhuma categoria cadastrada ainda.</p>
       ) : (
         <ul className="mt-4 divide-y divide-line rounded-lg border border-line">
-          {pagination.pageItems.map((category) => (
+          {tree.map((category) => (
             <CategoryRow
               key={category.id}
               category={category}
@@ -133,15 +132,12 @@ export function CategoryManager() {
                     )
                   : Promise.resolve(false)
               }
+              isLastCategory={ownCategoryCount <= 1}
               onDelete={(target) => setDeleting(target)}
             />
           ))}
         </ul>
       )}
-
-      <div className="mt-4">
-        <Pagination state={pagination} noun="categorias" hideSizeSelector />
-      </div>
 
       {deleting && (
         <DeleteCategoryDialog
@@ -162,6 +158,7 @@ interface CategoryRowProps {
   onToggle: () => void;
   onRename: (category: Category, name: string) => Promise<boolean>;
   onCreateChild: (name: string) => Promise<boolean>;
+  isLastCategory: boolean;
   onDelete: (category: Category, childCount: number) => void;
 }
 
@@ -172,6 +169,7 @@ function CategoryRow({
   onToggle,
   onRename,
   onCreateChild,
+  isLastCategory,
   onDelete,
 }: CategoryRowProps) {
   const [childName, setChildName] = useState('');
@@ -230,9 +228,13 @@ function CategoryRow({
               <Pencil className="h-4 w-4" aria-hidden />
             </IconButton>
             <IconButton
-              label={`Apagar categoria ${category.name}`}
+              label={
+                isLastCategory
+                  ? 'É preciso manter pelo menos 1 categoria'
+                  : `Apagar categoria ${category.name}`
+              }
               onClick={() => onDelete(category, category.children.length)}
-              disabled={busy}
+              disabled={busy || isLastCategory}
               danger
             >
               <Trash2 className="h-4 w-4" aria-hidden />

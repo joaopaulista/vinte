@@ -35,6 +35,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { Pagination } from '@/components/common/Pagination';
 import { formatCurrency, formatCurrencyCompact, formatMonthLabel, monthsAgo, toDateInputValue } from '@/utils/format';
 import {
+  billPaymentsByMonth,
   expensesByCategory,
   expensesByMerchant,
   expensesBySubcategory,
@@ -107,6 +108,9 @@ export default function Analytics() {
     const scope = inMonths(byCategory, scopeKeys);
 
     return {
+      // Faturas saem de `transactions` e não de `base`: são reprovadas de
+      // propósito (para não contar em dobro), mas o gráfico precisa delas.
+      bills: billPaymentsByMonth(transactions, keys.current),
       fixedCosts: analyzeFixedCosts(base),
       current: summarize(scope),
       previous: summarize(inMonths(byCategory, previousKeys)),
@@ -255,6 +259,8 @@ export default function Analytics() {
               onSelect={(key) => setSelectedMonth(key === selectedMonth ? null : key)}
             />
           </section>
+
+          <BillsSection data={view.bills} />
 
           <div className="grid gap-6 xl:grid-cols-2">
             <section className="card p-5">
@@ -581,5 +587,75 @@ function RankingChart({
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+function BillsSection({ data }: { data: { key: string; label: string; value: number }[] }) {
+  const paid = data.filter((point) => point.value > 0);
+  const total = paid.reduce((sum, point) => sum + point.value, 0);
+  const average = paid.length ? total / paid.length : 0;
+
+  return (
+    <section className="card p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-semibold text-ink">Faturas pagas por mês</h2>
+        {paid.length > 0 && (
+          <p className="text-sm text-ink-2 tabular-nums">
+            Total {formatCurrency(total)} · média {formatCurrency(average)}/mês
+          </p>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-ink-3">
+        Pagamentos de fatura do cartão. Ficam fora das despesas para não contar em dobro: o gasto já
+        entra em cada compra do cartão.
+      </p>
+
+      {paid.length === 0 ? (
+        <p className="py-10 text-center text-sm text-ink-3">Nenhum pagamento de fatura no período.</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={240}>
+          <BarChart data={data} margin={{ top: 20, right: 8, bottom: 0, left: 8 }}>
+            <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: CHART_COLORS.axis }} />
+            <YAxis
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={false}
+              width={64}
+              tickFormatter={(value: number) => formatCurrencyCompact(value)}
+            />
+            <Tooltip
+              cursor={{ fill: CHART_COLORS.cursor }}
+              content={({ active, payload, label }) =>
+                active && payload?.length ? (
+                  <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
+                    <p className="mb-1 font-semibold text-ink capitalize">{label}</p>
+                    <p className="font-medium text-ink tabular-nums">
+                      {formatCurrency(Number(payload[0].value))}
+                    </p>
+                  </div>
+                ) : null
+              }
+            />
+            <Bar
+              dataKey="value"
+              name="Fatura paga"
+              fill={CHART_COLORS.expense}
+              radius={[4, 4, 0, 0]}
+              maxBarSize={36}
+              isAnimationActive={false}
+            >
+              <LabelList
+                dataKey="value"
+                position="top"
+                fill={CHART_COLORS.muted}
+                fontSize={11}
+                formatter={(value: number) => (value > 0 ? formatCurrencyCompact(value) : '')}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </section>
   );
 }

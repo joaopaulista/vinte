@@ -33,6 +33,10 @@ export default function Transactions() {
     let income = 0;
     let expense = 0;
     for (const transaction of transactions) {
+      // Reprovada não entra na conta: é o jeito de tirar dos números um
+      // lançamento que não é receita nem despesa de verdade (ex.: o
+      // "pagamento recebido" da fatura no cartão).
+      if (transaction.reconciliation_status === 'rejected') continue;
       if (transaction.amount >= 0) income += transaction.amount;
       else expense += Math.abs(transaction.amount);
     }

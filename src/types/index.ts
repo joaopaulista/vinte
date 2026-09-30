@@ -58,6 +58,8 @@ export interface Transaction {
   notes: string | null;
   /** A categoria veio de uma regra, não de uma escolha do usuário. */
   auto_categorized: boolean;
+  /** Pagamento de fatura de cartão (reprovado automaticamente — ver migration 0009). */
+  bill_payment: boolean;
   created_at: string;
 }
 

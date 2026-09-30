@@ -84,6 +84,8 @@ export async function syncConnection(
           amount: signedAmount(transaction),
           transaction_date: transaction.date.slice(0, 10),
           type: transaction.type,
+          // Usada pela migration 0009 para reconhecer pagamento de fatura.
+          pluggy_category: transaction.category ?? null,
           reconciliation_status: 'pending',
         })),
         { onConflict: 'user_id,pluggy_transaction_id', ignoreDuplicates: true },

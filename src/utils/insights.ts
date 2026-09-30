@@ -198,3 +198,32 @@ export function inMonths(
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * Quanto foi pago de fatura em cada mês.
+ *
+ * O mesmo pagamento aparece dos dois lados (saída na conta corrente e
+ * "pagamento recebido" no cartão). Conta a saída da conta corrente; só usa o
+ * lado do cartão no mês em que a conta corrente não mostra o pagamento — por
+ * exemplo, fatura paga por um banco que não está conectado.
+ */
+export function billPaymentsByMonth(
+  transactions: TransactionWithRelations[],
+  monthKeys: string[],
+): { key: string; label: string; value: number }[] {
+  const outflow = new Map<string, number>();
+  const inflow = new Map<string, number>();
+
+  for (const transaction of transactions) {
+    if (!transaction.bill_payment) continue;
+    const key = monthKeyOf(transaction.transaction_date);
+    const target = transaction.amount < 0 ? outflow : inflow;
+    target.set(key, (target.get(key) ?? 0) + Math.abs(transaction.amount));
+  }
+
+  return monthKeys.map((key) => ({
+    key,
+    label: formatMonthLabel(`${key}-01`),
+    value: round2(outflow.get(key) || inflow.get(key) || 0),
+  }));
+}
