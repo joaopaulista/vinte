@@ -1,0 +1,195 @@
+@import 'tailwindcss';
+
+/*
+ * Paleta da marca VINTE
+ *   Azul Petróleo  #1E3A5F
+ *   Off White      #F8F6F2
+ *   Dourado Suave  #D4A857
+ *   Verde Sucesso  #2E8B57
+ *
+ * Os quatro hexes são os tons "de assinatura" — bons para fundos, superfícies e
+ * elementos grandes. Para texto pequeno e para séries de gráfico eles precisam
+ * de degraus próprios (mais escuros no tema claro, mais claros no escuro), senão
+ * o contraste cai abaixo do legível. Por isso existem os pares `*-ink`.
+ *
+ * `@theme inline` faz os utilitários do Tailwind apontarem para as variáveis em
+ * vez de congelarem o valor — é o que permite trocar o tema sem recompilar CSS.
+ */
+@theme inline {
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+
+  --color-page: var(--vinte-page);
+  --color-surface: var(--vinte-surface);
+  --color-surface-2: var(--vinte-surface-2);
+  --color-line: var(--vinte-line);
+
+  --color-ink: var(--vinte-ink);
+  --color-ink-2: var(--vinte-ink-2);
+  --color-ink-3: var(--vinte-ink-3);
+
+  --color-accent: var(--vinte-accent);
+  --color-accent-hover: var(--vinte-accent-hover);
+  --color-accent-ink: var(--vinte-accent-ink);
+
+  --color-gold: var(--vinte-gold);
+  --color-gold-ink: var(--vinte-gold-ink);
+  --color-success: var(--vinte-success);
+  --color-success-ink: var(--vinte-success-ink);
+  --color-success-surface: var(--vinte-success-surface);
+  --color-danger: var(--vinte-danger);
+  --color-danger-ink: var(--vinte-danger-ink);
+  --color-danger-surface: var(--vinte-danger-surface);
+  --color-warn-surface: var(--vinte-warn-surface);
+  --color-warn-ink: var(--vinte-warn-ink);
+  --color-info-surface: var(--vinte-info-surface);
+  --color-info-ink: var(--vinte-info-ink);
+
+  --color-series-1: var(--vinte-series-1);
+  --color-series-2: var(--vinte-series-2);
+  --color-grid: var(--vinte-grid);
+}
+
+/* Tema claro (padrão) */
+:root {
+  color-scheme: light;
+
+  --vinte-page: #f8f6f2;
+  --vinte-surface: #ffffff;
+  --vinte-surface-2: #f2efe9;
+  --vinte-line: #e4dfd5;
+
+  --vinte-ink: #1e3a5f;
+  --vinte-ink-2: #4a5f7a;
+  --vinte-ink-3: #6e7a8c;
+
+  --vinte-accent: #1e3a5f;
+  --vinte-accent-hover: #162c48;
+  --vinte-accent-ink: #f8f6f2;
+
+  --vinte-gold: #d4a857;
+  --vinte-gold-ink: #8f6a1f;
+  --vinte-success: #2e8b57;
+  --vinte-success-ink: #237049;
+  --vinte-success-surface: #eaf5ee;
+  --vinte-danger: #b3261e;
+  --vinte-danger-ink: #9b211a;
+  --vinte-danger-surface: #fdf0ef;
+  --vinte-warn-surface: #fbf3e2;
+  --vinte-warn-ink: #7d5c15;
+  --vinte-info-surface: #eef3f9;
+  --vinte-info-ink: #24507f;
+
+  /* Logo: o traço esquerdo do "V" clareia no tema escuro, como na arte original */
+  --vinte-logo-primary: #1e3a5f;
+  --vinte-logo-gold: #d4a857;
+  --vinte-logo-green: #2e8b57;
+
+  /* Séries validadas contra o fundo #f8f6f2 (ver README) */
+  --vinte-series-1: #1f63a8;
+  --vinte-series-2: #b0842e;
+  --vinte-grid: #e4dfd5;
+}
+
+/* Tema escuro — degraus próprios, não uma inversão automática do claro */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --vinte-page: #14273f;
+  --vinte-surface: #1e3a5f;
+  --vinte-surface-2: #26456e;
+  --vinte-line: #2e5480;
+
+  --vinte-ink: #f8f6f2;
+  --vinte-ink-2: #c3cedc;
+  --vinte-ink-3: #9fb0c4;
+
+  --vinte-accent: #d4a857;
+  --vinte-accent-hover: #c2963f;
+  --vinte-accent-ink: #14273f;
+
+  --vinte-gold: #d4a857;
+  --vinte-gold-ink: #e0bb79;
+  --vinte-success: #4caf7a;
+  --vinte-success-ink: #6ec698;
+  --vinte-success-surface: #1c3c30;
+  --vinte-danger: #e8635a;
+  --vinte-danger-ink: #f2938c;
+  --vinte-danger-surface: #3a2320;
+  --vinte-warn-surface: #3a3020;
+  --vinte-warn-ink: #e3bd72;
+  --vinte-info-surface: #1c3f66;
+  --vinte-info-ink: #a8c8e8;
+
+  --vinte-logo-primary: #45678f;
+  --vinte-logo-gold: #d4a857;
+  --vinte-logo-green: #34a165;
+
+  /* Séries validadas contra o fundo #1e3a5f (ver README) */
+  --vinte-series-1: #5195d0;
+  --vinte-series-2: #b98c3d;
+  --vinte-grid: #2e5480;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-page text-ink antialiased;
+    font-family: var(--font-sans);
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+
+  ::selection {
+    background: var(--vinte-gold);
+    color: #14273f;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-surface shadow-sm;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink
+           outline-none transition placeholder:text-ink-3
+           focus:border-accent focus:ring-2 focus:ring-accent/25
+           disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-2;
+  }
+
+  /* Tailwind v4 não resolve `@apply btn` a partir de outra classe custom, então
+     cada variante repete a base em vez de compor. */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+           transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-accent-ink hover:bg-accent-hover;
+  }
+
+  .btn-secondary {
+    @apply border border-line bg-surface text-ink-2 hover:bg-surface-2 hover:text-ink;
+  }
+
+  .btn-danger {
+    @apply border border-danger/30 bg-danger-surface text-danger-ink hover:border-danger/50;
+  }
+}

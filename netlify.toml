@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# O app é uma SPA: qualquer rota precisa cair no index.html, senão um F5 em
+# /conciliacao devolve 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
