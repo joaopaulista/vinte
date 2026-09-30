@@ -50,3 +50,44 @@ export async function createCategory(input: {
   if (error) throw error;
   return data as Category;
 }
+
+export async function renameCategory(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from('categories').update({ name }).eq('id', id);
+
+  if (error) throw error;
+}
+
+/**
+ * Remove uma categoria sem uso (a RLS impede apagar as do sistema). As
+ * subcategorias vão junto em cascata. Se houver transação usando, o banco
+ * recusa (`on delete restrict`) — use `reassignAndDeleteCategory`.
+ */
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Quantas transações usam a categoria (incluindo as subcategorias dela). */
+export async function getCategoryUsage(id: string): Promise<number> {
+  const { data, error } = await supabase.rpc('category_usage', { target: id });
+  if (error) throw error;
+  return (data as number | null) ?? 0;
+}
+
+/**
+ * Move as transações (e regras) para o destino e apaga a categoria, numa
+ * transação só no banco. Devolve quantas transações foram movidas.
+ */
+export async function reassignAndDeleteCategory(input: {
+  targetId: string;
+  newCategoryId: string;
+  newSubcategoryId: string | null;
+}): Promise<number> {
+  const { data, error } = await supabase.rpc('reassign_and_delete_category', {
+    target: input.targetId,
+    new_category: input.newCategoryId,
+    new_subcategory: input.newSubcategoryId,
+  });
+  if (error) throw error;
+  return (data as number | null) ?? 0;
+}

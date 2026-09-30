@@ -8,3 +8,25 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Cabeçalhos de segurança para todas as respostas.
+#   - frame-ancestors/X-Frame-Options: ninguém embute o VINTE num iframe
+#     (evita clickjacking na tela de login e de conciliação);
+#   - nosniff: o navegador não "adivinha" tipo de arquivo;
+#   - Referrer-Policy: não vaza a URL interna para sites externos;
+#   - HSTS: força HTTPS depois da primeira visita.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+# Assets com hash no nome podem ficar em cache para sempre; o index.html não.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

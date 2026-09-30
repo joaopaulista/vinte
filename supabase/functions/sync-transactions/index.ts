@@ -16,17 +16,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PluggyClient } from '../_shared/pluggy.ts';
 import { syncConnection } from '../_shared/sync.ts';
-import { errorMessage, json, preflight } from '../_shared/http.ts';
+import { errorResponse, isUuid, json, preflight, PublicError } from '../_shared/http.ts';
 
 /** Janela padrão de busca. Cobre reprocessamentos do banco sem puxar o histórico inteiro. */
 const LOOKBACK_DAYS = 90;
 
 Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') return preflight();
+  if (request.method === 'OPTIONS') return preflight(request);
+  if (request.method !== 'POST') return json({ error: 'Método não permitido' }, 405, request);
 
   const authorization = request.headers.get('Authorization');
   if (!authorization) {
-    return json({ error: 'Authorization header ausente' }, 401);
+    return json({ error: 'Authorization header ausente' }, 401, request);
   }
 
   const supabase = createClient(
@@ -37,18 +38,20 @@ Deno.serve(async (request) => {
 
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
-    return json({ error: 'Sessão inválida' }, 401);
+    return json({ error: 'Sessão inválida' }, 401, request);
   }
   const userId = userData.user.id;
 
-  let itemId: string | undefined;
-  if (request.method === 'POST') {
-    try {
-      const body = (await request.json()) as { itemId?: string };
-      itemId = body?.itemId;
-    } catch {
-      // Body vazio é um caso válido: significa "sincronize tudo que já existe".
-    }
+  let itemId: unknown;
+  try {
+    const body = (await request.json()) as { itemId?: unknown };
+    itemId = body?.itemId;
+  } catch {
+    // Body vazio é um caso válido: significa "sincronize tudo que já existe".
+  }
+
+  if (itemId !== undefined && !isUuid(itemId)) {
+    return json({ error: 'itemId inválido' }, 400, request);
   }
 
   try {
@@ -83,20 +86,30 @@ Deno.serve(async (request) => {
       transactionsInserted += result.transactionsInserted;
     }
 
-    return json({
-      connections: connections?.length ?? 0,
-      accountsSynced,
-      transactionsInserted,
-    });
+    return json(
+      {
+        connections: connections?.length ?? 0,
+        accountsSynced,
+        transactionsInserted,
+      },
+      200,
+      request,
+    );
   } catch (cause) {
     console.error('sync-transactions falhou', cause);
-    return json({ error: errorMessage(cause) }, 500);
+    return errorResponse(cause, request);
   }
 });
 
 /**
  * Grava a conexão recém-criada no widget. O nome da instituição vem do próprio
  * Pluggy para não depender do que o frontend mandar.
+ *
+ * As credenciais do Pluggy são da aplicação, não do usuário: elas enxergam os
+ * itens de TODOS os usuários. Sem conferir o `clientUserId`, qualquer pessoa
+ * logada que descobrisse o itemId de outra poderia registrá-lo para si e puxar
+ * o extrato alheio. O connect token amarra o item ao usuário que o criou, e é
+ * isso que conferimos aqui.
  */
 async function registerConnection(
   supabase: SupabaseClient,
@@ -105,6 +118,9 @@ async function registerConnection(
   itemId: string,
 ): Promise<void> {
   const item = await pluggy.getItem(itemId);
+  if (item.clientUserId !== userId) {
+    throw new PublicError('Conexão não pertence a este usuário', 403);
+  }
 
   const { error } = await supabase.from('bank_connections').upsert(
     {

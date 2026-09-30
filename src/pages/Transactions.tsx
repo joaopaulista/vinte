@@ -4,6 +4,8 @@ import { TransactionFilters } from '@/components/transactions/TransactionFilters
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
+import { Pagination } from '@/components/common/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { usePendingCount } from '@/contexts/PendingCountContext';
@@ -25,6 +27,7 @@ export default function Transactions() {
   const { tree } = useCategories();
   const { refreshPendingCount } = usePendingCount();
   const [reopeningId, setReopeningId] = useState<string | null>(null);
+  const pagination = usePagination(transactions, 20);
 
   const totals = useMemo(() => {
     let income = 0;
@@ -82,13 +85,8 @@ export default function Transactions() {
             <SummaryTile label="Resultado" value={totals.balance} tone="text-ink" />
           </div>
 
-          <p className="text-sm text-ink-2">
-            {transactions.length}{' '}
-            {transactions.length === 1 ? 'transação encontrada' : 'transações encontradas'}
-          </p>
-
           <TransactionsTable
-            transactions={transactions}
+            transactions={pagination.pageItems}
             renderActions={(transaction) =>
               transaction.reconciliation_status === 'pending' ? null : (
                 <button
@@ -104,6 +102,8 @@ export default function Transactions() {
               )
             }
           />
+
+          <Pagination state={pagination} noun="transações" />
         </>
       )}
     </div>

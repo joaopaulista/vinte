@@ -5,6 +5,8 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
+import { usePagination } from '@/hooks/usePagination';
+import { Pagination } from '@/components/common/Pagination';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingCount } from '@/contexts/PendingCountContext';
 import { reconcileTransaction } from '@/services/transactionsService';
@@ -26,6 +28,8 @@ export default function Reconciliation() {
     () => transactions.filter((transaction) => !resolvedIds.has(transaction.id)),
     [transactions, resolvedIds],
   );
+
+  const pagination = usePagination(queue, 10);
 
   const uncategorized = queue.filter((transaction) => !transaction.category_id).length;
 
@@ -154,7 +158,7 @@ export default function Reconciliation() {
         </div>
       ) : (
         <div className="space-y-4">
-          {queue.map((transaction) => (
+          {pagination.pageItems.map((transaction) => (
             <ReconciliationCard
               key={transaction.id}
               transaction={transaction}
@@ -174,6 +178,7 @@ export default function Reconciliation() {
               }
             />
           ))}
+          <Pagination state={pagination} noun="pendentes" hideSizeSelector />
         </div>
       )}
     </div>

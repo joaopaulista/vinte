@@ -3,6 +3,8 @@ import { Building2, Loader2, RefreshCw, Wallet } from 'lucide-react';
 import { ConnectBankButton } from '@/components/accounts/ConnectBankButton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
+import { Pagination } from '@/components/common/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 import { fetchAccounts, fetchBankConnections } from '@/services/accountsService';
 import { syncTransactions } from '@/services/pluggyService';
 import { usePendingCount } from '@/contexts/PendingCountContext';
@@ -60,6 +62,7 @@ export default function Accounts() {
     }
   }
 
+  const pagination = usePagination(accounts, 9);
   const totalBalance = accounts.reduce((sum, account) => sum + (account.balance ?? 0), 0);
 
   return (
@@ -124,7 +127,7 @@ export default function Accounts() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {accounts.map((account) => (
+            {pagination.pageItems.map((account) => (
               <div key={account.id} className="card p-5">
                 <div className="flex items-center gap-2 text-sm text-ink-2">
                   <Building2 className="h-4 w-4" aria-hidden />
@@ -143,6 +146,8 @@ export default function Accounts() {
               </div>
             ))}
           </div>
+
+          <Pagination state={pagination} noun="contas" hideSizeSelector />
         </>
       )}
     </div>

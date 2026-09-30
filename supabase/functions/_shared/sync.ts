@@ -1,5 +1,6 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isSettled, PluggyClient, signedAmount } from './pluggy.ts';
+import { isUuid, PublicError } from './http.ts';
 
 export interface SyncTarget {
   connectionId: string;
@@ -25,6 +26,18 @@ export async function syncConnection(
   target: SyncTarget,
   lookbackDays: number,
 ): Promise<SyncResult> {
+  // Conexões de demonstração (seed) não existem no Pluggy.
+  if (!isUuid(target.pluggyItemId)) return { accountsSynced: 0, transactionsInserted: 0 };
+
+  // A RLS deixa o usuário gravar qualquer `pluggy_item_id` na própria linha de
+  // bank_connections, e as credenciais do Pluggy enxergam os itens de todos.
+  // Por isso a posse é conferida aqui, no único caminho que puxa extrato — e
+  // não só no registro da conexão.
+  const item = await pluggy.getItem(target.pluggyItemId);
+  if (item.clientUserId !== target.userId) {
+    throw new PublicError('Conexão não pertence a este usuário', 403);
+  }
+
   const dateFrom = new Date(Date.now() - lookbackDays * 86_400_000).toISOString().slice(0, 10);
   const { results: pluggyAccounts } = await pluggy.listAccounts(target.pluggyItemId);
 
@@ -73,7 +86,7 @@ export async function syncConnection(
           type: transaction.type,
           reconciliation_status: 'pending',
         })),
-        { onConflict: 'pluggy_transaction_id', ignoreDuplicates: true },
+        { onConflict: 'user_id,pluggy_transaction_id', ignoreDuplicates: true },
       )
       .select('id');
 

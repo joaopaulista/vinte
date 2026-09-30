@@ -11,6 +11,8 @@ import Transactions from '@/pages/Transactions';
 import Reconciliation from '@/pages/Reconciliation';
 import Accounts from '@/pages/Accounts';
 import Settings from '@/pages/Settings';
+import Categories from '@/pages/Categories';
+import Analytics from '@/pages/Analytics';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
 
@@ -41,9 +43,11 @@ export default function App() {
               }
             >
               <Route path="/" element={<Dashboard />} />
+              <Route path="/analises" element={<Analytics />} />
               <Route path="/conciliacao" element={<Reconciliation />} />
               <Route path="/transacoes" element={<Transactions />} />
               <Route path="/contas" element={<Accounts />} />
+              <Route path="/categorias" element={<Categories />} />
               <Route path="/configuracoes" element={<Settings />} />
             </Route>
 

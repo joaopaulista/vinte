@@ -16,7 +16,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PluggyClient } from '../_shared/pluggy.ts';
 import { syncConnection } from '../_shared/sync.ts';
-import { errorMessage, json } from '../_shared/http.ts';
+import { errorResponse, isUuid, json } from '../_shared/http.ts';
 
 const LOOKBACK_DAYS = 30;
 
@@ -66,8 +66,8 @@ Deno.serve(async (request) => {
     return json({ error: 'Corpo inválido' }, 400);
   }
 
-  if (!payload.itemId) {
-    return json({ error: 'itemId ausente' }, 400);
+  if (!isUuid(payload?.itemId)) {
+    return json({ error: 'itemId inválido' }, 400);
   }
 
   if (!RELEVANT_EVENTS.includes(payload.event)) {
@@ -80,32 +80,47 @@ Deno.serve(async (request) => {
   );
 
   try {
-    const { data: connection, error: connectionError } = await supabase
+    // Sem `.single()`: se alguém gravar o mesmo itemId na própria conta, isso
+    // não pode derrubar o webhook do dono legítimo. O `syncConnection` confere
+    // a posse de cada linha e só o dono real passa.
+    const { data: connections, error: connectionsError } = await supabase
       .from('bank_connections')
       .select('id, user_id, pluggy_item_id')
-      .eq('pluggy_item_id', payload.itemId)
-      .maybeSingle();
+      .eq('pluggy_item_id', payload.itemId);
 
-    if (connectionError) throw connectionError;
-    if (!connection) {
-      return json({ error: 'Conexão desconhecida para esse itemId' }, 404);
+    if (connectionsError) throw connectionsError;
+    // 200 e não 404: não confirmamos para quem chama quais itemIds existem, e
+    // o Pluggy não fica reenviando um evento que nunca vamos processar.
+    if (!connections?.length) {
+      return json({ ignored: 'unknown item' });
     }
 
     const pluggy = await PluggyClient.connect();
-    const result = await syncConnection(
-      supabase,
-      pluggy,
-      {
-        connectionId: connection.id,
-        userId: connection.user_id,
-        pluggyItemId: connection.pluggy_item_id,
-      },
-      LOOKBACK_DAYS,
-    );
+    let accountsSynced = 0;
+    let transactionsInserted = 0;
 
-    return json({ event: payload.event, ...result });
+    for (const connection of connections) {
+      try {
+        const result = await syncConnection(
+          supabase,
+          pluggy,
+          {
+            connectionId: connection.id,
+            userId: connection.user_id,
+            pluggyItemId: connection.pluggy_item_id,
+          },
+          LOOKBACK_DAYS,
+        );
+        accountsSynced += result.accountsSynced;
+        transactionsInserted += result.transactionsInserted;
+      } catch (cause) {
+        console.error('pluggy-webhook: conexão ignorada', connection.id, cause);
+      }
+    }
+
+    return json({ event: payload.event, accountsSynced, transactionsInserted });
   } catch (cause) {
     console.error('pluggy-webhook falhou', cause);
-    return json({ error: errorMessage(cause) }, 500);
+    return errorResponse(cause);
   }
 });

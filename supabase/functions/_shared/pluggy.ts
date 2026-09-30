@@ -34,6 +34,8 @@ export interface PluggyTransaction {
 export interface PluggyItem {
   id: string;
   status: string;
+  /** Preenchido com o id do usuário do VINTE quando o connect token foi emitido. */
+  clientUserId?: string | null;
   connector?: { id: number; name: string; imageUrl?: string };
 }
 
@@ -105,7 +107,7 @@ export class PluggyClient {
   }
 
   getItem(itemId: string): Promise<PluggyItem> {
-    return this.request<PluggyItem>(`items/${itemId}`);
+    return this.request<PluggyItem>(`items/${encodeURIComponent(itemId)}`);
   }
 
   listAccounts(itemId: string): Promise<{ results: PluggyAccount[] }> {

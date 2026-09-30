@@ -6,14 +6,15 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PluggyClient } from '../_shared/pluggy.ts';
-import { errorMessage, json, preflight } from '../_shared/http.ts';
+import { errorResponse, json, preflight } from '../_shared/http.ts';
 
 Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') return preflight();
+  if (request.method === 'OPTIONS') return preflight(request);
+  if (request.method !== 'POST') return json({ error: 'Método não permitido' }, 405, request);
 
   const authorization = request.headers.get('Authorization');
   if (!authorization) {
-    return json({ error: 'Authorization header ausente' }, 401);
+    return json({ error: 'Authorization header ausente' }, 401, request);
   }
 
   const supabase = createClient(
@@ -24,7 +25,7 @@ Deno.serve(async (request) => {
 
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
-    return json({ error: 'Sessão inválida' }, 401);
+    return json({ error: 'Sessão inválida' }, 401, request);
   }
 
   try {
@@ -34,9 +35,9 @@ Deno.serve(async (request) => {
       avoidDuplicates: true,
     });
 
-    return json({ accessToken });
+    return json({ accessToken }, 200, request);
   } catch (cause) {
     console.error('pluggy-connect-token falhou', cause);
-    return json({ error: errorMessage(cause) }, 500);
+    return errorResponse(cause, request);
   }
 });

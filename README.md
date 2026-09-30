@@ -28,6 +28,8 @@ arquivos de `supabase/migrations/` **na ordem**:
 3. `0003_demo_data.sql` — cria a função `seed_demo_data()` (opcional, mas recomendado no início)
 4. `0004_category_rules.sql` — motor de categorização automática
 5. `0005_default_category_rules.sql` — 136 regras padrão de categorização
+6. `0006_security_hardening.sql` — endurece a RLS e tira o seed da API pública (**obrigatória**)
+7. `0007_category_delete_lock.sql` — impede apagar categoria em uso e move as transações antes de apagar
 
 ### 2. Configurar as variáveis
 
@@ -124,6 +126,13 @@ qualquer anomalia até o fim do mês.
 - As **chaves do Pluggy** ficam só nos secrets das Edge Functions, nunca no bundle do frontend.
 - A **senha do banco do usuário** nunca passa pelo sistema — fica dentro do widget do Pluggy.
 - O webhook do Pluggy exige um segredo compartilhado (`x-webhook-secret`) porque roda sem JWT.
+- Toda sincronização confere no Pluggy que o item pertence a quem está pedindo
+  (`clientUserId`) — as credenciais do Pluggy enxergam os itens de todos os usuários.
+- Erros internos nunca voltam para o navegador; ficam só no log da função.
+- Em produção, restrinja o CORS: `npx supabase secrets set ALLOWED_ORIGINS=https://seu-dominio`.
+
+Detalhes, checklist de deploy e como reportar vulnerabilidades: [SECURITY.md](SECURITY.md).
+O workflow `security` roda o gitleaks sobre todo o histórico a cada push.
 
 ## Estrutura
 
@@ -217,7 +226,7 @@ npx supabase login
 ```
 
 ```bash
-npx supabase link --project-ref ypinaxgqkdeyhndqbflv
+npx supabase link --project-ref <project-ref>
 ```
 
 Guarde as credenciais do Pluggy como secrets — elas nunca entram no `.env` nem no bundle:
@@ -241,7 +250,7 @@ npx supabase functions deploy pluggy-webhook --no-verify-jwt
 ```
 
 No painel do Pluggy, cadastre a URL:
-`https://ypinaxgqkdeyhndqbflv.functions.supabase.co/pluggy-webhook?secret=<o-mesmo-segredo>`
+`https://<project-ref>.functions.supabase.co/pluggy-webhook?secret=<o-mesmo-segredo>`
 
 O segredo vai na query string porque o cadastro de webhook do Pluggy aceita só a URL, sem
 headers customizados. A função também aceita o header `x-webhook-secret`, que é preferível

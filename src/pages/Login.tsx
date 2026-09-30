@@ -5,6 +5,16 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthShell } from '@/components/auth/AuthShell';
 
+/**
+ * Só aceita caminhos internos. `//evil.com` e `/\evil.com` são interpretados
+ * pelo navegador como URLs de outro domínio (open redirect).
+ */
+function safeRedirect(state: unknown): string {
+  const from = (state as { from?: unknown } | null)?.from;
+  if (typeof from !== 'string' || !from.startsWith('/') || /^\/[/\\]/.test(from)) return '/';
+  return from;
+}
+
 export default function Login() {
   const { signIn, user, loading } = useAuth();
   const navigate = useNavigate();
@@ -16,8 +26,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   if (!loading && user) {
-    const from = (location.state as { from?: string } | null)?.from ?? '/';
-    return <Navigate to={from} replace />;
+    return <Navigate to={safeRedirect(location.state)} replace />;
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -27,7 +36,7 @@ export default function Login() {
 
     try {
       await signIn(email.trim(), password);
-      navigate((location.state as { from?: string } | null)?.from ?? '/', { replace: true });
+      navigate(safeRedirect(location.state), { replace: true });
     } catch (cause) {
       setError(translateAuthError(cause));
       setSubmitting(false);

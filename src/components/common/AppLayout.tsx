@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
+  BarChart3,
   CheckCircle2,
   LayoutDashboard,
   ListOrdered,
@@ -9,6 +10,7 @@ import {
   Moon,
   Settings as SettingsIcon,
   Sun,
+  Tags,
   Wallet,
   X,
 } from 'lucide-react';
@@ -27,9 +29,11 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/analises', label: 'Análises', icon: BarChart3 },
   { to: '/conciliacao', label: 'Conciliação', icon: CheckCircle2, showPendingBadge: true },
   { to: '/transacoes', label: 'Transações', icon: ListOrdered },
   { to: '/contas', label: 'Contas', icon: Wallet },
+  { to: '/categorias', label: 'Categorias', icon: Tags },
   { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon },
 ];
 
