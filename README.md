@@ -32,6 +32,7 @@ arquivos de `supabase/migrations/` **na ordem**:
 7. `0007_category_delete_lock.sql` — impede apagar categoria em uso e move as transações antes de apagar
 8. `0008_keep_one_category.sql` — impede apagar a última categoria do usuário
 9. `0009_bill_payments.sql` — reconhece pagamento de fatura e reprova automaticamente (não conta em dobro)
+10. `0010_card_installments.sql` — guarda as parcelas das compras no cartão (6/8) para a previsão das faturas
 
 ### 2. Configurar as variáveis
 

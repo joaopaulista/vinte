@@ -12,6 +12,7 @@ const PLUGGY_API = 'https://api.pluggy.ai';
 export interface PluggyAccount {
   id: string;
   itemId: string;
+  /** BANK ou CREDIT. */
   type: string;
   subtype?: string;
   name: string;
@@ -30,6 +31,14 @@ export interface PluggyTransaction {
   /** PENDING ainda pode mudar de valor ou sumir; POSTED está liquidada. */
   status?: 'PENDING' | 'POSTED';  /** Categoria do próprio Pluggy (em inglês), ex.: "Credit card payment". */
   category?: string | null;
+  /** Só em cartão de crédito. */
+  creditCardMetadata?: {
+    installmentNumber?: number | null;
+    totalInstallments?: number | null;
+    totalAmount?: number | null;
+    purchaseDate?: string | null;
+    billId?: string | null;
+  } | null;
 }
 
 export interface PluggyItem {
@@ -157,4 +166,26 @@ export function signedAmount(transaction: PluggyTransaction): number {
  */
 export function isSettled(transaction: PluggyTransaction): boolean {
   return transaction.status === undefined || transaction.status === 'POSTED';
+}
+
+export function isCreditCard(account: Pick<PluggyAccount, 'type' | 'subtype'>): boolean {
+  return account.type === 'CREDIT' || account.subtype === 'CREDIT_CARD';
+}
+
+/**
+ * Colunas de parcela para a tabela `transactions`. Compra à vista (1/1 ou sem
+ * metadado) fica com tudo nulo — "1/1" ao lado da compra só poluiria a tela.
+ */
+export function installmentsOf(transaction: PluggyTransaction) {
+  const metadata = transaction.creditCardMetadata;
+  const total = metadata?.totalInstallments ?? null;
+  const number = metadata?.installmentNumber ?? null;
+  const installment = total !== null && total > 1 && number !== null && number >= 1;
+
+  return {
+    installment_number: installment ? number : null,
+    total_installments: installment ? total : null,
+    purchase_date: installment && metadata?.purchaseDate ? metadata.purchaseDate.slice(0, 10) : null,
+    pluggy_bill_id: metadata?.billId ?? null,
+  };
 }

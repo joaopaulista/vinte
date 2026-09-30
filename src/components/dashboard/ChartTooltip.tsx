@@ -18,7 +18,7 @@ export function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
   return (
     <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
       {label !== undefined && (
-        <p className="mb-1 font-semibold text-ink capitalize">{label}</p>
+        <p className="mb-1 font-semibold text-ink first-letter:uppercase">{label}</p>
       )}
       {payload.map((entry) => (
         <p key={entry.name} className="flex items-center gap-2 text-ink-2">

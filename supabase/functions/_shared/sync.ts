@@ -1,5 +1,5 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { isSettled, PluggyClient, signedAmount } from './pluggy.ts';
+import { installmentsOf, isCreditCard, isSettled, PluggyClient, signedAmount } from './pluggy.ts';
 import { isUuid, PublicError } from './http.ts';
 
 export interface SyncTarget {
@@ -71,6 +71,9 @@ export async function syncConnection(
     );
     if (transactions.length === 0) continue;
 
+    // Parcela ("6 de 8") só existe em cartão; em conta corrente fica nulo.
+    const onCard = isCreditCard(pluggyAccount);
+
     // `ignoreDuplicates` é essencial: sem ele, um re-sync sobrescreveria a
     // categoria e o status de transações que o usuário já conciliou.
     const { data: inserted, error: insertError } = await supabase
@@ -86,6 +89,7 @@ export async function syncConnection(
           type: transaction.type,
           // Usada pela migration 0009 para reconhecer pagamento de fatura.
           pluggy_category: transaction.category ?? null,
+          ...(onCard ? installmentsOf(transaction) : {}),
           reconciliation_status: 'pending',
         })),
         { onConflict: 'user_id,pluggy_transaction_id', ignoreDuplicates: true },
@@ -94,6 +98,32 @@ export async function syncConnection(
 
     if (insertError) throw insertError;
     transactionsInserted += inserted?.length ?? 0;
+
+    // Transações que já existiam (importadas antes das parcelas serem
+    // guardadas) recebem os dados de parcela agora. O upsert só atualiza as
+    // colunas enviadas aqui — categoria, status e observação da conciliação
+    // não estão na lista e ficam intactos. Valor e data vão só porque são
+    // obrigatórios na linha, e são os mesmos do Pluggy.
+    if (onCard) {
+      const withInstallments = transactions.filter(
+        (transaction) => (transaction.creditCardMetadata?.totalInstallments ?? 0) > 1,
+      );
+      if (withInstallments.length > 0) {
+        const { error: metadataError } = await supabase.from('transactions').upsert(
+          withInstallments.map((transaction) => ({
+            user_id: target.userId,
+            account_id: account.id,
+            pluggy_transaction_id: transaction.id,
+            amount: signedAmount(transaction),
+            transaction_date: transaction.date.slice(0, 10),
+            pluggy_category: transaction.category ?? null,
+            ...installmentsOf(transaction),
+          })),
+          { onConflict: 'user_id,pluggy_transaction_id' },
+        );
+        if (metadataError) throw metadataError;
+      }
+    }
   }
 
   await supabase

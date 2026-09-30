@@ -29,6 +29,8 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { FixedCostsPanel } from '@/components/analytics/FixedCostsPanel';
+import { CardForecastPanel } from '@/components/analytics/CardForecastPanel';
+import { buildCardForecast } from '@/utils/cardForecast';
 import { analyzeFixedCosts } from '@/utils/fixedCosts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { usePagination } from '@/hooks/usePagination';
@@ -81,7 +83,7 @@ export default function Analytics() {
   const [metric, setMetric] = useState<Metric>('expense');
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [category, setCategory] = useState<{ id: string | null; name: string } | null>(null);
-  const [tab, setTab] = useState<'overview' | 'fixed'>('overview');
+  const [tab, setTab] = useState<'overview' | 'fixed' | 'forecast'>('overview');
 
   // Busca o dobro do período (para o período anterior de comparação) e no
   // mínimo 7 meses, que é o histórico da detecção de custos fixos.
@@ -111,6 +113,7 @@ export default function Analytics() {
       // Faturas saem de `transactions` e não de `base`: são reprovadas de
       // propósito (para não contar em dobro), mas o gráfico precisa delas.
       bills: billPaymentsByMonth(transactions, keys.current),
+      forecast: buildCardForecast(transactions),
       fixedCosts: analyzeFixedCosts(base),
       current: summarize(scope),
       previous: summarize(inMonths(byCategory, previousKeys)),
@@ -149,6 +152,7 @@ export default function Analytics() {
           [
             ['overview', 'Visão geral'],
             ['fixed', 'Custos fixos e equilíbrio'],
+            ['forecast', 'Contas a pagar'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -166,48 +170,51 @@ export default function Analytics() {
         ))}
       </div>
 
-      {/* Filtros: uma linha só, acima de tudo que eles afetam */}
-      <div className="card flex flex-wrap items-center gap-x-5 gap-y-3 p-4">
-        {tab === 'overview' && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-ink-2">Período</span>
-            <div className="flex rounded-lg border border-line p-0.5" role="radiogroup" aria-label="Período">
-              {PERIOD_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  role="radio"
-                  aria-checked={period === option}
-                  onClick={() => {
-                    setPeriod(option);
-                    setSelectedMonth(null);
-                  }}
-                  className={`rounded-md px-3 py-1 text-sm transition ${
-                    period === option ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:text-ink'
-                  }`}
-                >
-                  {option} meses
-                </button>
-              ))}
+      {/* Filtros: uma linha só, acima de tudo que eles afetam. A previsão do
+          cartão não usa nenhum deles. */}
+      {tab !== 'forecast' && (
+        <div className="card flex flex-wrap items-center gap-x-5 gap-y-3 p-4">
+          {tab === 'overview' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink-2">Período</span>
+              <div className="flex rounded-lg border border-line p-0.5" role="radiogroup" aria-label="Período">
+                {PERIOD_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={period === option}
+                    onClick={() => {
+                      setPeriod(option);
+                      setSelectedMonth(null);
+                    }}
+                    className={`rounded-md px-3 py-1 text-sm transition ${
+                      period === option ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    {option} meses
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <Toggle checked={includePending} onChange={setIncludePending} label="Incluir pendentes" />
-        <Toggle checked={ignoreTransfers} onChange={setIgnoreTransfers} label="Ignorar transferências" />
+          <Toggle checked={includePending} onChange={setIncludePending} label="Incluir pendentes" />
+          <Toggle checked={ignoreTransfers} onChange={setIgnoreTransfers} label="Ignorar transferências" />
 
-        {tab === 'overview' && hasFilters && (
-          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
-            {selectedMonth && (
-              <FilterChip
-                label={formatMonthLabel(`${selectedMonth}-01`)}
-                onClear={() => setSelectedMonth(null)}
-              />
-            )}
-            {category && <FilterChip label={category.name} onClear={() => setCategory(null)} />}
-          </div>
-        )}
-      </div>
+          {tab === 'overview' && hasFilters && (
+            <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+              {selectedMonth && (
+                <FilterChip
+                  label={formatMonthLabel(`${selectedMonth}-01`)}
+                  onClear={() => setSelectedMonth(null)}
+                />
+              )}
+              {category && <FilterChip label={category.name} onClear={() => setCategory(null)} />}
+            </div>
+          )}
+        </div>
+      )}
 
       {transactions.length === 0 ? (
         <div className="card">
@@ -219,6 +226,8 @@ export default function Analytics() {
         </div>
       ) : tab === 'fixed' ? (
         <FixedCostsPanel report={view.fixedCosts} />
+      ) : tab === 'forecast' ? (
+        <CardForecastPanel forecast={view.forecast} />
       ) : (
         <>
           {/* KPIs: clicar escolhe a métrica do gráfico de evolução */}
@@ -485,7 +494,7 @@ function MonthlyChart({
           content={({ active, payload, label }) =>
             active && payload?.length ? (
               <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
-                <p className="mb-1 font-semibold text-ink capitalize">{label}</p>
+                <p className="mb-1 font-semibold text-ink first-letter:uppercase">{label}</p>
                 <p className="font-medium text-ink tabular-nums">
                   {payload[0].value === null || payload[0].value === undefined
                     ? '—'
@@ -629,7 +638,7 @@ function BillsSection({ data }: { data: { key: string; label: string; value: num
               content={({ active, payload, label }) =>
                 active && payload?.length ? (
                   <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
-                    <p className="mb-1 font-semibold text-ink capitalize">{label}</p>
+                    <p className="mb-1 font-semibold text-ink first-letter:uppercase">{label}</p>
                     <p className="font-medium text-ink tabular-nums">
                       {formatCurrency(Number(payload[0].value))}
                     </p>

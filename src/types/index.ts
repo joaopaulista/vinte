@@ -60,12 +60,17 @@ export interface Transaction {
   auto_categorized: boolean;
   /** Pagamento de fatura de cartão (reprovado automaticamente — ver migration 0009). */
   bill_payment: boolean;
+  /** Parcela da compra no cartão (6 de 8). Nulo em compra à vista e em conta corrente. */
+  installment_number: number | null;
+  total_installments: number | null;
+  /** Data original da compra parcelada. */
+  purchase_date: string | null;
   created_at: string;
 }
 
 /** Transação com os relacionamentos que o app costuma exibir junto. */
 export interface TransactionWithRelations extends Transaction {
-  account: Pick<Account, 'id' | 'name'> | null;
+  account: Pick<Account, 'id' | 'name' | 'type'> | null;
   category: Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
   subcategory: Pick<Category, 'id' | 'name'> | null;
 }

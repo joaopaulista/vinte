@@ -12,8 +12,9 @@ import type {
 const TRANSACTION_SELECT = `
   id, user_id, account_id, pluggy_transaction_id, description, amount,
   transaction_date, type, category_id, subcategory_id,
-  reconciliation_status, reconciled_at, notes, auto_categorized, bill_payment, created_at,
-  account:accounts!transactions_account_id_fkey (id, name),
+  reconciliation_status, reconciled_at, notes, auto_categorized, bill_payment,
+  installment_number, total_installments, purchase_date, created_at,
+  account:accounts!transactions_account_id_fkey (id, name, type),
   category:categories!transactions_category_id_fkey (id, name, color, icon),
   subcategory:categories!transactions_subcategory_id_fkey (id, name)
 `;

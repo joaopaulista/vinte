@@ -75,3 +75,14 @@ function capitalize(value: string): string {
   const lower = value.toLocaleLowerCase('pt-BR');
   return lower.charAt(0).toLocaleUpperCase('pt-BR') + lower.slice(1);
 }
+
+/**
+ * Tira a marcação de parcela do nome ("PARC 06/08", "6/8", "06 DE 08"),
+ * que muda de uma parcela para outra da mesma compra.
+ */
+export function stripInstallment(name: string): string {
+  return name
+    .replace(/\b(parc(ela)?\.?\s*)?\d{1,2}\s*(\/|de)\s*\d{1,2}\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}

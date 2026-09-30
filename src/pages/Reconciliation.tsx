@@ -12,6 +12,7 @@ import { usePendingCount } from '@/contexts/PendingCountContext';
 import { reconcileTransaction } from '@/services/transactionsService';
 import { applyRulesToPending, learnCategoryRule } from '@/services/categoryRulesService';
 import { formatCurrency, formatDate } from '@/utils/format';
+import { buildSuggester } from '@/utils/categorySuggestion';
 
 /** Minúsculas e sem acento: "transferencia" acha "Transferência". */
 function normalize(value: string): string {
@@ -21,6 +22,8 @@ function normalize(value: string): string {
 export default function Reconciliation() {
   const { transactions, loading, error, reload } = useTransactions({ status: 'pending' });
   const { tree, loading: loadingCategories } = useCategories();
+  // Histórico do que já foi aprovado: é dele que sai a sugestão de categoria.
+  const { transactions: history, loading: loadingHistory } = useTransactions({ status: 'approved' });
   const { refreshPendingCount } = usePendingCount();
   const { user } = useAuth();
 
@@ -57,6 +60,20 @@ export default function Reconciliation() {
   }, [queue, search]);
 
   const pagination = usePagination(filtered, 10);
+
+  const suggestFor = useMemo(() => {
+    const suggest = buildSuggester(history);
+    const valid = new Set(tree.flatMap((category) => [category.id, ...category.children.map((child) => child.id)]));
+    return (transaction: (typeof queue)[number]) => {
+      const suggestion = suggest(transaction);
+      // Categoria que foi apagada ou movida desde então não serve de sugestão.
+      if (!suggestion || !valid.has(suggestion.categoryId)) return null;
+      if (suggestion.subcategoryId && !valid.has(suggestion.subcategoryId)) {
+        return { ...suggestion, subcategoryId: null };
+      }
+      return suggestion;
+    };
+  }, [history, tree]);
 
   const uncategorized = queue.filter((transaction) => !transaction.category_id).length;
 
@@ -108,7 +125,7 @@ export default function Reconciliation() {
     }
   }
 
-  if (loading || loadingCategories) return <Spinner label="Carregando pendências…" />;
+  if (loading || loadingCategories || loadingHistory) return <Spinner label="Carregando pendências…" />;
 
   if (error) {
     return (
@@ -226,6 +243,7 @@ export default function Reconciliation() {
               key={transaction.id}
               transaction={transaction}
               tree={tree}
+              suggestion={suggestFor(transaction)}
               onApprove={(categoryId, subcategoryId, notes) =>
                 resolve(
                   transaction.id,

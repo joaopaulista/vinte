@@ -31,7 +31,11 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
                 {formatDate(transaction.transaction_date)}
               </td>
               <td className="max-w-md px-4 py-3">
-                <DescriptionLabel description={transaction.description} />
+                <DescriptionLabel
+                  description={transaction.description}
+                  installmentNumber={transaction.installment_number}
+                  totalInstallments={transaction.total_installments}
+                />
                 {transaction.account?.name && (
                   <p className="text-xs text-ink-3">{transaction.account.name}</p>
                 )}
