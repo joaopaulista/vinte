@@ -3,6 +3,7 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,29 +26,36 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
         <EmptyState
           icon={CreditCard}
           title="Nenhum cartão de crédito conectado"
-          description="Conecte o cartão em Contas para ver a previsão das próximas faturas."
+          description="Conecte o cartão em Contas para ver as faturas e a previsão das próximas."
         />
       </div>
     );
   }
 
-  const next = forecast.months[0];
-  const nextTotal = next ? next.posted + next.projected : 0;
+  const current = forecast.months.find((month) => month.key === forecast.currentKey);
+  const currentTotal = current ? current.posted + current.projected : 0;
 
   return (
     <div className="space-y-6">
       <section className="card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-ink">Previsão das faturas</h2>
+            <h2 className="text-base font-semibold text-ink">Faturas</h2>
             <p className="mt-1 text-sm text-ink-2">
-              O que já está lançado no cartão mais as parcelas que ainda vão entrar, mês a mês.
+              Antes de hoje, o que foi lançado em cada fatura. De hoje em diante, a previsão: o já
+              lançado mais as parcelas que ainda vão entrar.
             </p>
           </div>
-          <div className="flex gap-6 text-right">
+          <div className="flex flex-wrap gap-6 text-right">
+            <div>
+              <p className="text-xs text-ink-2">Média dos meses anteriores</p>
+              <p className="text-lg font-semibold text-ink tabular-nums">
+                {forecast.pastAverage > 0 ? formatCurrency(forecast.pastAverage) : '—'}
+              </p>
+            </div>
             <div>
               <p className="text-xs text-ink-2">Fatura deste mês</p>
-              <p className="text-lg font-semibold text-ink tabular-nums">{formatCurrency(nextTotal)}</p>
+              <p className="text-lg font-semibold text-ink tabular-nums">{formatCurrency(currentTotal)}</p>
             </div>
             <div>
               <p className="text-xs text-ink-2">Parcelas a vencer</p>
@@ -80,7 +88,9 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
                     <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
                       <p className="mb-1 font-semibold text-ink first-letter:uppercase">{label}</p>
                       <TooltipRow color={CHART_COLORS.income} label="Já lançado" value={posted} />
-                      <TooltipRow color={CHART_COLORS.expense} label="Parcelas previstas" value={projected} />
+                      {projected > 0 && (
+                        <TooltipRow color={CHART_COLORS.expense} label="Parcelas previstas" value={projected} />
+                      )}
                       <p className="mt-1 flex justify-between gap-4 border-t border-line pt-1 font-semibold text-ink">
                         <span>Total</span>
                         <span className="tabular-nums">{formatCurrency(posted + projected)}</span>
@@ -97,6 +107,15 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
                 iconSize={8}
                 wrapperStyle={{ fontSize: 12, color: CHART_COLORS.muted }}
               />
+              {/* Separa o que já passou (fatura real) do que é previsão */}
+              {current && (
+                <ReferenceLine
+                  x={current.label}
+                  stroke={CHART_COLORS.muted}
+                  strokeDasharray="4 4"
+                  label={{ value: 'hoje', position: 'insideTopLeft', fill: CHART_COLORS.muted, fontSize: 11 }}
+                />
+              )}
               {/* Empilhadas com 2px de respiro entre os segmentos */}
               <Bar
                 dataKey="posted"
@@ -126,7 +145,8 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
         <p className="mt-3 flex gap-2 text-xs text-ink-3">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           As parcelas previstas são projetadas a partir da última parcela que o banco mandou de cada
-          compra. Compras da fatura em aberto só aparecem depois que o banco as confirma.
+          compra. O histórico vai até onde a sincronização alcança (cerca de 3 meses). Compras da
+          fatura em aberto só aparecem depois que o banco as confirma.
         </p>
       </section>
 

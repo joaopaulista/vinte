@@ -4,7 +4,8 @@ import { splitDescription, stripInstallment } from './merchant';
 import type { TransactionWithRelations } from '@/types';
 
 /**
- * Previsão das faturas do cartão: quanto vem em cada mês.
+ * Faturas do cartão mês a mês: as dos meses anteriores (o que foi lançado)
+ * e a previsão das próximas (o lançado mais as parcelas que ainda vão vir).
  *
  * O banco manda cada parcela quando ela entra na fatura. Uma compra em 8x
  * que está na parcela 6 ainda tem a 7 e a 8 pela frente — elas não existem
@@ -15,6 +16,9 @@ import type { TransactionWithRelations } from '@/types';
  * recente" e a projeção recomeça dali — então nunca conta em dobro.
  */
 
+/** Meses anteriores no gráfico. O histórico do cartão vem da sincronização (90 dias). */
+const PAST_MONTHS = 6;
+/** Mês atual + próximos. */
 const FORECAST_MONTHS = 12;
 
 export interface ForecastMonth {
@@ -24,6 +28,8 @@ export interface ForecastMonth {
   posted: number;
   /** Parcelas futuras projetadas. */
   projected: number;
+  /** Mês já encerrado: a coluna mostra a fatura que foi, não uma previsão. */
+  past: boolean;
 }
 
 export interface InstallmentPurchase {
@@ -45,6 +51,10 @@ export interface CardForecast {
   purchases: InstallmentPurchase[];
   /** Soma de todas as parcelas que ainda vão vir. */
   remainingTotal: number;
+  /** 'YYYY-MM' do mês atual. */
+  currentKey: string;
+  /** Média das faturas dos meses anteriores que tiveram lançamento. */
+  pastAverage: number;
   hasCard: boolean;
 }
 
@@ -81,7 +91,10 @@ export function buildCardForecast(
   reference = new Date(),
 ): CardForecast {
   const thisMonth = currentMonthKey(reference);
-  const monthKeys = Array.from({ length: FORECAST_MONTHS }, (_, index) => addMonths(thisMonth, index));
+  const firstMonth = addMonths(thisMonth, -PAST_MONTHS);
+  const monthKeys = Array.from({ length: PAST_MONTHS + FORECAST_MONTHS }, (_, index) =>
+    addMonths(firstMonth, index),
+  );
   const posted = new Map<string, number>();
   const projected = new Map<string, number>();
   const latest = new Map<string, TransactionWithRelations>();
@@ -96,7 +109,7 @@ export function buildCardForecast(
 
   for (const transaction of cardExpenses) {
     const month = billMonth(transaction);
-    if (month >= thisMonth) {
+    if (month >= firstMonth) {
       posted.set(month, (posted.get(month) ?? 0) + Math.abs(transaction.amount));
     }
 
@@ -151,15 +164,24 @@ export function buildCardForecast(
 
   purchases.sort((a, b) => b.remainingTotal - a.remainingTotal || a.name.localeCompare(b.name));
 
+  const pastWithData = monthKeys
+    .filter((key) => key < thisMonth && (posted.get(key) ?? 0) > 0)
+    .map((key) => posted.get(key) ?? 0);
+
   return {
     months: monthKeys.map((key) => ({
       key,
       label: formatMonthLabel(`${key}-01`),
       posted: round2(posted.get(key) ?? 0),
       projected: round2(projected.get(key) ?? 0),
+      past: key < thisMonth,
     })),
     purchases,
     remainingTotal: round2(purchases.reduce((sum, purchase) => sum + purchase.remainingTotal, 0)),
+    currentKey: thisMonth,
+    pastAverage: pastWithData.length
+      ? round2(pastWithData.reduce((sum, value) => sum + value, 0) / pastWithData.length)
+      : 0,
     hasCard: transactions.some(isCard),
   };
 }
