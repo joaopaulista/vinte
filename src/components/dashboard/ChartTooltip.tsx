@@ -28,7 +28,7 @@ export function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
             aria-hidden
           />
           <span>{entry.name}</span>
-          <span className="ml-auto pl-3 font-medium text-ink tabular-nums">
+          <span className="ml-auto pl-3 font-medium text-ink num">
             {formatCurrency(Number(entry.value))}
           </span>
         </p>

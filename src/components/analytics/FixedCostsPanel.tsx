@@ -13,11 +13,11 @@ const STATUS: Record<FixedCostStatus, { label: string; icon: LucideIcon; tone: s
 };
 
 export function FixedCostsPanel({ report }: { report: FixedCostReport }) {
-  const pagination = usePagination(report.items, 10);
+  const pagination = usePagination(report.items);
 
   if (report.historyMonths < 2) {
     return (
-      <div className="card">
+      <div className="card page-fill justify-center">
         <EmptyState
           icon={Repeat}
           title="Pouco histórico para identificar custos fixos"
@@ -28,11 +28,14 @@ export function FixedCostsPanel({ report }: { report: FixedCostReport }) {
   }
 
   return (
-    <div className="space-y-6">
-      <Breakeven report={report} />
+    // Desktop: equilíbrio à esquerda, a lista de custos fixos à direita.
+    <div className="page-grid lg:grid-cols-5 lg:grid-rows-1">
+      <div className="scroll-y lg:col-span-2">
+        <Breakeven report={report} />
+      </div>
 
-      <section className="space-y-3">
-        <div>
+      <section className="flex min-w-0 flex-col gap-3 lg:col-span-3 lg:min-h-0">
+        <div className="shrink-0">
           <h2 className="text-base font-semibold text-ink">Custos fixos identificados</h2>
           <p className="mt-1 text-sm text-ink-2">
             Gastos que se repetem ~1 vez por mês com valor estável, nos últimos {report.historyMonths}{' '}
@@ -47,10 +50,10 @@ export function FixedCostsPanel({ report }: { report: FixedCostReport }) {
           </div>
         ) : (
           <>
-            <div className="card overflow-x-auto">
+            <div className="card overflow-auto overscroll-contain lg:min-h-0">
               <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left text-xs font-semibold tracking-wide text-ink-2 uppercase">
+                <thead className="sticky top-0 z-10 bg-surface [&_th]:shadow-[inset_0_-1px_0_var(--vinte-line)]">
+                  <tr className="text-left text-xs font-semibold tracking-wide text-ink-2 uppercase">
                     <th className="px-4 py-3">Gasto</th>
                     <th className="px-4 py-3">Categoria</th>
                     <th className="px-4 py-3 text-center">Dia</th>
@@ -66,7 +69,7 @@ export function FixedCostsPanel({ report }: { report: FixedCostReport }) {
                 </tbody>
               </table>
             </div>
-            <Pagination state={pagination} noun="custos fixos" hideSizeSelector />
+            <Pagination state={pagination} noun="custos fixos" />
           </>
         )}
       </section>
@@ -91,8 +94,8 @@ function FixedCostRow({ item }: { item: FixedCost }) {
         {item.category ?? '—'}
         {item.subcategory && <span className="text-ink-3"> · {item.subcategory}</span>}
       </td>
-      <td className="px-4 py-3 text-center text-ink-2 tabular-nums">~{item.typicalDay}</td>
-      <td className="px-4 py-3 text-center text-ink-2 tabular-nums">
+      <td className="px-4 py-3 text-center text-ink-2 num">~{item.typicalDay}</td>
+      <td className="px-4 py-3 text-center text-ink-2 num">
         {item.monthsPresent}/{item.historyMonths} meses
       </td>
       <td className="px-4 py-3">
@@ -102,7 +105,7 @@ function FixedCostRow({ item }: { item: FixedCost }) {
           {item.status === 'paid' && ` ${formatCurrency(item.paidThisMonth)}`}
         </span>
       </td>
-      <td className="px-4 py-3 text-right font-medium text-ink tabular-nums">
+      <td className="px-4 py-3 text-right font-medium text-ink num">
         {item.amountKind === 'variable' && '~'}
         {formatCurrency(item.monthly)}
       </td>
@@ -125,12 +128,12 @@ function Breakeven({ report }: { report: FixedCostReport }) {
       <h2 className="text-base font-semibold text-ink">Ponto de equilíbrio</h2>
       <p className="mt-1 text-sm text-ink-2">Quanto precisa entrar por mês para pagar todas as contas.</p>
 
-      <p className="mt-4 text-3xl font-semibold text-ink tabular-nums">
+      <p className="mt-4 text-3xl font-semibold text-ink num">
         {formatCurrency(breakeven)}
         <span className="ml-2 text-base font-normal text-ink-2">por mês</span>
       </p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3">
         <Tile label="Custos fixos" value={formatCurrency(fixedMonthly)} hint="O mínimo para não atrasar nada" />
         <Tile label="Variáveis (média)" value={formatCurrency(variableMonthly)} hint="Mercado, lazer, avulsos" />
         <Tile label="Sua renda média" value={formatCurrency(averageIncome)} hint={`Últimos ${report.historyMonths} meses`} />
@@ -143,7 +146,7 @@ function Breakeven({ report }: { report: FixedCostReport }) {
       </div>
 
       {/* Barra: fixos + variáveis = necessidade; o traço marca a renda média */}
-      <div className="mt-6">
+      <div className="mt-5">
         <div className="relative h-4 overflow-hidden rounded-full bg-surface-2" aria-hidden>
           <div className="absolute inset-y-0 left-0 flex gap-0.5" style={{ width: pct(breakeven) }}>
             <div className="h-full bg-series-2" style={{ flex: fixedMonthly || 0.0001 }} />
@@ -161,10 +164,10 @@ function Breakeven({ report }: { report: FixedCostReport }) {
         </div>
       </div>
 
-      <div className="mt-6 rounded-lg bg-surface-2 p-4">
+      <div className="mt-5 rounded-lg bg-surface-2 p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <span className="font-medium text-ink">Neste mês</span>
-          <span className="text-ink-2 tabular-nums">
+          <span className="text-ink-2 num">
             entrou {formatCurrency(incomeThisMonth)} de {formatCurrency(breakeven)} ({(monthProgress * 100).toFixed(0)}%)
           </span>
         </div>
@@ -186,7 +189,7 @@ function Tile({ label, value, hint, tone = 'text-ink' }: { label: string; value:
   return (
     <div className="rounded-lg border border-line p-3">
       <p className="text-xs text-ink-2">{label}</p>
-      <p className={`mt-1 text-lg font-semibold tabular-nums ${tone}`}>{value}</p>
+      <p className={`mt-1 text-lg font-semibold num ${tone}`}>{value}</p>
       <p className="text-xs text-ink-3">{hint}</p>
     </div>
   );

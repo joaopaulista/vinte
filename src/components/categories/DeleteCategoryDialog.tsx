@@ -72,7 +72,7 @@ export function DeleteCategoryDialog({ category, tree, onCancel, onConfirm }: De
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-night/50 p-4"
       role="presentation"
       onClick={(event) => event.target === event.currentTarget && !busy && onCancel()}
     >

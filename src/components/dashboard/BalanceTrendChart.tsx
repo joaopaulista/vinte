@@ -26,7 +26,7 @@ export interface BalanceTrendPoint {
  */
 export function BalanceTrendChart({ data }: { data: BalanceTrendPoint[] }) {
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
         <XAxis
@@ -45,7 +45,7 @@ export function BalanceTrendChart({ data }: { data: BalanceTrendPoint[] }) {
         <Tooltip content={<ChartTooltip />} cursor={{ stroke: CHART_COLORS.axis }} />
         <ReferenceLine y={0} stroke={CHART_COLORS.axis} strokeDasharray="4 4" />
         <Line
-          type="monotone"
+          type="linear"
           dataKey="balance"
           name="Saldo"
           stroke={CHART_COLORS.single}

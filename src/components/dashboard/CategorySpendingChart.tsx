@@ -17,17 +17,33 @@ export interface CategorySpendingPoint {
   total: number;
 }
 
+/** Altura mínima para as barras não ficarem espremidas; acima disso, o gráfico ocupa o espaço que tiver. */
+export function categoryChartMinHeight(count: number): number {
+  return Math.max(160, count * 30 + 40);
+}
+
 /**
  * Barras horizontais ordenadas: a comparação é de magnitude entre categorias,
  * e o nome de cada uma fica legível sem rotacionar rótulo (o que uma pizza ou
  * um gráfico de colunas não dariam com 8 categorias).
+ *
+ * Preenche a altura do contêiner. Com `onSelect`, clicar numa barra (ou na
+ * linha dela) escolhe a categoria.
  */
-export function CategorySpendingChart({ data }: { data: CategorySpendingPoint[] }) {
-  const height = Math.max(220, data.length * 38 + 40);
-
+export function CategorySpendingChart({
+  data,
+  onSelect,
+}: {
+  data: CategorySpendingPoint[];
+  onSelect?: (name: string) => void;
+}) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart
+        className={onSelect ? 'cursor-pointer' : undefined}
+        onClick={(state: { activeLabel?: string } | null) => {
+          if (onSelect && state?.activeLabel) onSelect(state.activeLabel);
+        }}
         data={data}
         layout="vertical"
         margin={{ top: 4, right: 72, bottom: 4, left: 8 }}
@@ -55,7 +71,7 @@ export function CategorySpendingChart({ data }: { data: CategorySpendingPoint[] 
           name="Gasto"
           fill={CHART_COLORS.single}
           radius={[0, 4, 4, 0]}
-          maxBarSize={20}
+          maxBarSize={28}
           isAnimationActive={false}
         >
           <LabelList

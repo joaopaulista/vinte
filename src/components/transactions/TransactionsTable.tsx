@@ -12,10 +12,11 @@ interface TransactionsTableProps {
 
 export function TransactionsTable({ transactions, renderActions }: TransactionsTableProps) {
   return (
-    <div className="card overflow-x-auto">
+    // Rola por dentro (as duas direções) e o cabeçalho fica parado no topo.
+    <div className="card overflow-auto overscroll-contain lg:min-h-0">
       <table className="w-full min-w-[720px] text-sm">
-        <thead>
-          <tr className="border-b border-line text-left text-xs font-semibold tracking-wide text-ink-2 uppercase">
+        <thead className="sticky top-0 z-10 bg-surface [&_th]:shadow-[inset_0_-1px_0_var(--vinte-line)]">
+          <tr className="text-left text-xs font-semibold tracking-wide text-ink-2 uppercase">
             <th className="px-4 py-3">Data</th>
             <th className="px-4 py-3">Descrição</th>
             <th className="px-4 py-3">Categoria</th>
@@ -27,7 +28,7 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
         <tbody className="divide-y divide-line">
           {transactions.map((transaction) => (
             <tr key={transaction.id} className="hover:bg-surface-2">
-              <td className="px-4 py-3 whitespace-nowrap text-ink-2 tabular-nums">
+              <td className="px-4 py-2.5 whitespace-nowrap text-ink-2 num">
                 {formatDate(transaction.transaction_date)}
               </td>
               <td className="max-w-md px-4 py-3">
@@ -40,12 +41,12 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
                   <p className="text-xs text-ink-3">{transaction.account.name}</p>
                 )}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-2.5">
                 {transaction.category ? (
                   <span className="inline-flex items-center gap-2">
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: transaction.category.color ?? 'var(--vinte-ink-3)' }}
+                      style={{ backgroundColor: 'var(--vinte-mint)' }}
                       aria-hidden
                     />
                     <span className="text-ink-2">
@@ -59,18 +60,18 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
                   <span className="text-ink-3">—</span>
                 )}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-2.5">
                 <StatusBadge status={transaction.reconciliation_status} />
               </td>
               <td
-                className={`px-4 py-3 text-right font-medium whitespace-nowrap tabular-nums ${
+                className={`px-4 py-3 text-right font-medium whitespace-nowrap num ${
                   transaction.amount > 0 ? 'text-success-ink' : 'text-ink'
                 }`}
               >
                 {formatCurrency(transaction.amount)}
               </td>
               {renderActions && (
-                <td className="px-4 py-3 text-right">{renderActions(transaction)}</td>
+                <td className="px-4 py-2.5 text-right">{renderActions(transaction)}</td>
               )}
             </tr>
           ))}

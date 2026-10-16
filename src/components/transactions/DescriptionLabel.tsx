@@ -41,7 +41,7 @@ export function DescriptionLabel({
       </span>
       {installment && (
         <span
-          className="shrink-0 rounded-full border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-2 tabular-nums"
+          className="shrink-0 rounded-full border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-2 num"
           title={`Parcela ${installmentNumber} de ${totalInstallments}`}
         >
           {installment}

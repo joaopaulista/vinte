@@ -19,9 +19,9 @@ export function TransactionFilters({
   }
 
   return (
-    <div className="card p-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <div className="xl:col-span-2">
+    <div className="card shrink-0 p-3">
+      <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto]">
+        <div>
           <label className="label" htmlFor="filter-search">
             Buscar
           </label>
@@ -102,10 +102,8 @@ export function TransactionFilters({
             />
           </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex justify-end">
-        <button type="button" className="btn-secondary" onClick={onReset}>
+        <button type="button" className="btn-secondary justify-self-end" onClick={onReset}>
           Limpar filtros
         </button>
       </div>

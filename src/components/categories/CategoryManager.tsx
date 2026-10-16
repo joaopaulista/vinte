@@ -4,6 +4,8 @@ import { Check, ChevronRight, Loader2, Lock, Pencil, Plus, Trash2, X } from 'luc
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/hooks/useCategories';
 import { DeleteCategoryDialog } from './DeleteCategoryDialog';
+import { Pagination } from '@/components/common/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 import {
   createCategory,
   deleteCategory,
@@ -34,6 +36,7 @@ export function CategoryManager() {
   // Regra: precisa sobrar pelo menos 1 categoria (o banco também garante).
   const ownCategoryCount = tree.filter((category) => category.user_id !== null).length;
   const [deleting, setDeleting] = useState<Category | null>(null);
+  const pagination = usePagination(tree);
 
   async function run(action: () => Promise<unknown>): Promise<boolean> {
     setBusy(true);
@@ -76,13 +79,13 @@ export function CategoryManager() {
   }
 
   return (
-    <section className="card p-5">
-      <h2 className="text-base font-semibold text-ink">Categorias e subcategorias</h2>
-      <p className="mt-1 text-sm text-ink-2">
+    <section className="panel lg:flex-1">
+      <h2 className="shrink-0 text-base font-semibold text-ink">Categorias e subcategorias</h2>
+      <p className="mt-1 shrink-0 text-sm text-ink-2">
         Clique numa categoria para ver, criar e editar as subcategorias.
       </p>
 
-      <form className="mt-4 flex gap-2" onSubmit={(event) => void handleCreateCategory(event)}>
+      <form className="mt-4 flex shrink-0 gap-2" onSubmit={(event) => void handleCreateCategory(event)}>
         <label className="sr-only" htmlFor="new-category">
           Nova categoria
         </label>
@@ -106,7 +109,7 @@ export function CategoryManager() {
       </form>
 
       {(feedback || error) && (
-        <p className="mt-3 text-sm text-danger-ink" role="alert">
+        <p className="mt-3 shrink-0 text-sm text-danger-ink" role="alert">
           {feedback ?? error}
         </p>
       )}
@@ -116,27 +119,32 @@ export function CategoryManager() {
       ) : tree.length === 0 ? (
         <p className="mt-4 text-sm text-ink-3">Nenhuma categoria cadastrada ainda.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-line rounded-lg border border-line">
-          {tree.map((category) => (
-            <CategoryRow
-              key={category.id}
-              category={category}
-              expanded={expanded === category.id}
-              busy={busy}
-              onToggle={() => setExpanded(expanded === category.id ? null : category.id)}
-              onRename={(target, name) => run(() => renameCategory(target.id, name))}
-              onCreateChild={(name) =>
-                user
-                  ? run(() =>
-                      createCategory({ userId: user.id, name, parentCategoryId: category.id }),
-                    )
-                  : Promise.resolve(false)
-              }
-              isLastCategory={ownCategoryCount <= 1}
-              onDelete={(target) => setDeleting(target)}
-            />
-          ))}
-        </ul>
+        <>
+          <ul className="scroll-y mt-4 divide-y divide-line rounded-lg border border-line">
+            {pagination.pageItems.map((category) => (
+              <CategoryRow
+                key={category.id}
+                category={category}
+                expanded={expanded === category.id}
+                busy={busy}
+                onToggle={() => setExpanded(expanded === category.id ? null : category.id)}
+                onRename={(target, name) => run(() => renameCategory(target.id, name))}
+                onCreateChild={(name) =>
+                  user
+                    ? run(() =>
+                        createCategory({ userId: user.id, name, parentCategoryId: category.id }),
+                      )
+                    : Promise.resolve(false)
+                }
+                isLastCategory={ownCategoryCount <= 1}
+                onDelete={(target) => setDeleting(target)}
+              />
+            ))}
+          </ul>
+          <div className="mt-3">
+            <Pagination state={pagination} noun="categorias" />
+          </div>
+        </>
       )}
 
       {deleting && (
@@ -210,7 +218,7 @@ function CategoryRow({
             {category.color && (
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: category.color }}
+                style={{ backgroundColor: 'var(--vinte-mint)' }}
                 aria-hidden
               />
             )}

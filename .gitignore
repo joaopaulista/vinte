@@ -36,3 +36,7 @@ Thumbs.db
 
 # Scripts SQL com dados pessoais (não vão para o repositório)
 supabase/local/
+
+# Relatórios e sessões do impeccable (revisões de design, não são código)
+.impeccable/critique/
+.impeccable/live/

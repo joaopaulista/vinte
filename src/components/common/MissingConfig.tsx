@@ -16,7 +16,7 @@ export function MissingConfig() {
           base) com:
         </p>
 
-        <pre className="mt-3 overflow-x-auto rounded-lg bg-ink p-3 text-xs text-page">
+        <pre className="mt-3 overflow-x-auto rounded-xl bg-deep p-3 text-xs text-mist">
           {`VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-anon-key`}
         </pre>

@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -17,11 +19,12 @@ import {
   BarChart3,
   ChevronLeft,
   Minus,
-  PiggyBank,
+  Percent,
+  SlidersHorizontal,
+  X,
   Scale,
   TrendingDown,
   TrendingUp,
-  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AXIS_TICK, CHART_COLORS } from '@/components/dashboard/chartTheme';
@@ -35,7 +38,9 @@ import { analyzeFixedCosts } from '@/utils/fixedCosts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { usePagination } from '@/hooks/usePagination';
 import { Pagination } from '@/components/common/Pagination';
+import { PageHeader } from '@/components/common/PageHeader';
 import { formatCurrency, formatCurrencyCompact, formatMonthLabel, monthsAgo, toDateInputValue } from '@/utils/format';
+import { currentMonthKey, lastMonthKeys } from '@/utils/analytics';
 import {
   billPaymentsByMonth,
   expensesByCategory,
@@ -50,7 +55,11 @@ import {
 } from '@/utils/insights';
 import type { Metric, RankedItem, Summary } from '@/utils/insights';
 
-const PERIOD_OPTIONS = [3, 6, 12] as const;
+/** Período em meses: o padrão compara o mês atual com o anterior. */
+const DEFAULT_PERIOD = 1;
+const MAX_PERIOD = 24;
+/** O gráfico de evolução mostra pelo menos este número de meses, mesmo com período curto. */
+const MIN_CHART_MONTHS = 6;
 
 const METRICS: {
   key: Metric;
@@ -61,7 +70,6 @@ const METRICS: {
   { key: 'expense', label: 'Despesas', icon: TrendingDown, lowerIsBetter: true },
   { key: 'income', label: 'Receitas', icon: TrendingUp },
   { key: 'balance', label: 'Saldo', icon: Scale },
-  { key: 'savings', label: 'Taxa de poupança', icon: PiggyBank },
 ];
 
 function formatMetric(metric: Metric, value: number | null): string {
@@ -76,23 +84,87 @@ function previousMonthKey(key: string): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+type Tab = 'overview' | 'gastos' | 'transacoes' | 'fixed' | 'forecast';
+
+// A página não rola: cada aba mostra o que cabe numa tela. Por isso a antiga
+// "Visão geral" foi dividida em três (indicadores, gastos e a lista).
+const TABS: [Tab, string][] = [
+  ['overview', 'Visão geral'],
+  ['gastos', 'Gastos e faturas'],
+  ['transacoes', 'Transações'],
+  ['fixed', 'Custos fixos e equilíbrio'],
+  ['forecast', 'Contas a pagar'],
+];
+
+/** Nomes curtos para caber as abas numa tela de celular. */
+const SHORT_TAB_LABELS: Record<Tab, string> = {
+  overview: 'Geral',
+  gastos: 'Gastos',
+  transacoes: 'Lista',
+  fixed: 'Fixos',
+  forecast: 'A pagar',
+};
+
+/** Abas que usam o recorte de período, mês e categoria. */
+const PERIOD_TABS: Tab[] = ['overview', 'gastos', 'transacoes'];
+
+const METRIC_KEYS = METRICS.map((item) => item.key);
+
+function monthDay(isoDate: string): number {
+  return Number(isoDate.slice(8, 10));
+}
+
 export default function Analytics() {
-  const [period, setPeriod] = useState<(typeof PERIOD_OPTIONS)[number]>(6);
+  // Aba, período, mês, categoria e métrica ficam no endereço: recarregar a
+  // página ou usar "Voltar" devolve a pessoa exatamente onde ela estava.
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = TABS.some(([key]) => key === params.get('aba')) ? (params.get('aba') as Tab) : 'overview';
+  const periodParam = Number(params.get('periodo'));
+  const period =
+    Number.isInteger(periodParam) && periodParam >= 1 && periodParam <= MAX_PERIOD ? periodParam : DEFAULT_PERIOD;
+  const metric: Metric = METRIC_KEYS.includes(params.get('metrica') as Metric)
+    ? (params.get('metrica') as Metric)
+    : 'expense';
+  const selectedMonth = params.get('mes');
+  const categoryId = params.get('categoria');
+  // Subcategoria só vale junto com a categoria dela.
+  const subcategoryId = categoryId ? params.get('subcategoria') : null;
   const [includePending, setIncludePending] = useState(false);
   const [ignoreTransfers, setIgnoreTransfers] = useState(true);
-  const [metric, setMetric] = useState<Metric>('expense');
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [category, setCategory] = useState<{ id: string | null; name: string } | null>(null);
-  const [tab, setTab] = useState<'overview' | 'fixed' | 'forecast'>('overview');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Ir para uma aba à direita faz o conteúdo entrar pela direita, e vice-versa.
+  const tabIndex = TABS.findIndex(([key]) => key === tab);
+  const previousTabIndex = useRef(tabIndex);
+  const tabDirection = tabIndex >= previousTabIndex.current ? 'animate-from-right' : 'animate-from-left';
+  useEffect(() => {
+    previousTabIndex.current = tabIndex;
+  }, [tabIndex]);
+
+  const update = (changes: Record<string, string | null>, push = false) => {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) next.delete(key);
+      else next.set(key, value);
+    }
+    // Trocar de aba entra no histórico ("Voltar" funciona); filtros não.
+    setParams(next, { replace: !push });
+  };
 
   // Busca o dobro do período (para o período anterior de comparação) e no
-  // mínimo 7 meses, que é o histórico da detecção de custos fixos.
+  // mínimo 7 meses: histórico da detecção de custos fixos e do gráfico
+  // (6 meses, mais o anterior do mês mais antigo, caso ele seja clicado).
   const { transactions, loading, error } = useTransactions({
-    from: toDateInputValue(monthsAgo(Math.max(period * 2, 7) - 1)),
+    from: toDateInputValue(monthsAgo(Math.max(period * 2, MIN_CHART_MONTHS + 1) - 1)),
   });
 
   const view = useMemo(() => {
+    const today = new Date();
+    const day = today.getDate();
+    const thisMonth = currentMonthKey(today);
     const keys = periodKeys(period);
+    // Com período curto o gráfico ainda mostra a tendência dos últimos meses.
+    const chartKeys = period >= MIN_CHART_MONTHS ? keys.current : lastMonthKeys(MIN_CHART_MONTHS, today);
 
     const base = transactions.filter(
       (transaction) =>
@@ -101,13 +173,55 @@ export default function Analytics() {
         !(ignoreTransfers && isTransfer(transaction)),
     );
 
-    const byCategory = category
-      ? base.filter((transaction) => (transaction.category?.id ?? null) === category.id)
-      : base;
+    const categoryName =
+      categoryId === null
+        ? null
+        : (base.find((transaction) => transaction.category?.id === categoryId)?.category?.name ?? 'Categoria');
+    const subcategoryName =
+      subcategoryId === null
+        ? null
+        : (base.find((transaction) => transaction.subcategory?.id === subcategoryId)?.subcategory?.name ??
+          'Subcategoria');
+    const byCategory = base.filter(
+      (transaction) =>
+        (!categoryId || transaction.category?.id === categoryId) &&
+        (!subcategoryId || transaction.subcategory?.id === subcategoryId),
+    );
 
     const scopeKeys = selectedMonth ? [selectedMonth] : keys.current;
     const previousKeys = selectedMonth ? [previousMonthKey(selectedMonth)] : keys.previous;
     const scope = inMonths(byCategory, scopeKeys);
+
+    // Comparação justa: se o recorte termina no mês atual (que está pela
+    // metade), o último mês do período anterior também é cortado no mesmo
+    // dia. Sem isso, "3 dias de outubro" perderia sempre para "setembro inteiro".
+    const partial = scopeKeys[scopeKeys.length - 1] === thisMonth;
+    const lastPrevious = previousKeys[previousKeys.length - 1];
+    const previousScope = inMonths(byCategory, previousKeys).filter(
+      (transaction) =>
+        !partial ||
+        !transaction.transaction_date.startsWith(lastPrevious) ||
+        monthDay(transaction.transaction_date) <= day,
+    );
+
+    const label = (key: string) => formatMonthLabel(`${key}-01`);
+    const range = (list: string[]) =>
+      list.length === 1 ? label(list[0]) : `${label(list[0])} – ${label(list[list.length - 1])}`;
+
+    // Opções dos campos Mês, Categoria e Subcategoria (alternativa ao clique no gráfico).
+    const categoryOptions = new Map<string, string>();
+    const subcategoryOptions = new Map<string, string>();
+    for (const transaction of inMonths(base, [...new Set([...chartKeys, ...keys.current])])) {
+      if (transaction.amount >= 0 || !transaction.category) continue;
+      categoryOptions.set(transaction.category.id, transaction.category.name);
+      if (transaction.category.id === categoryId && transaction.subcategory) {
+        subcategoryOptions.set(transaction.subcategory.id, transaction.subcategory.name);
+      }
+    }
+    const sortOptions = (options: Map<string, string>) =>
+      [...options.entries()]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
     return {
       // Faturas saem de `transactions` e não de `base`: são reprovadas de
@@ -116,16 +230,24 @@ export default function Analytics() {
       forecast: buildCardForecast(transactions),
       fixedCosts: analyzeFixedCosts(base),
       current: summarize(scope),
-      previous: summarize(inMonths(byCategory, previousKeys)),
-      monthly: monthlyMetric(inMonths(byCategory, keys.current), keys.current, metric),
-      ranking: category ? expensesBySubcategory(scope) : expensesByCategory(inMonths(base, scopeKeys)),
+      previous: summarize(previousScope),
+      monthly: monthlyMetric(inMonths(byCategory, chartKeys), chartKeys, metric),
+      ranking: categoryId ? expensesBySubcategory(scope) : expensesByCategory(inMonths(base, scopeKeys)),
       merchants: expensesByMerchant(scope),
       rows: [...scope].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)),
-      comparisonLabel: selectedMonth ? 'vs. mês anterior' : `vs. ${period} meses anteriores`,
+      categoryName,
+      subcategoryName,
+      // Nome curto do recorte filtrado, para frases como "Despesas em Compras".
+      filterName: subcategoryName ? `${categoryName} › ${subcategoryName}` : categoryName,
+      monthOptions: chartKeys.map((key) => ({ key, label: label(key) })),
+      categoryOptions: sortOptions(categoryOptions),
+      subcategoryOptions: sortOptions(subcategoryOptions),
+      scopeLabel: `${range(scopeKeys)}${partial ? ` (${label(thisMonth)} até o dia ${day})` : ''}`,
+      comparisonLabel: `vs. ${range(previousKeys)}${partial ? ` (${label(lastPrevious)} até o dia ${day})` : ''}`,
     };
-  }, [transactions, period, includePending, ignoreTransfers, metric, selectedMonth, category]);
+  }, [transactions, period, includePending, ignoreTransfers, metric, selectedMonth, categoryId, subcategoryId]);
 
-  const pagination = usePagination(view.rows, 20);
+  const pagination = usePagination(view.rows);
 
   if (loading) return <Spinner label="Calculando análises…" />;
 
@@ -136,187 +258,563 @@ export default function Analytics() {
   }
 
   const selectedMetric = METRICS.find((item) => item.key === metric)!;
-  const hasFilters = selectedMonth !== null || category !== null;
+  const usesPeriod = PERIOD_TABS.includes(tab);
+  const hasScopeFilters = period !== DEFAULT_PERIOD || Boolean(selectedMonth || categoryId || subcategoryId);
+  const activeFilters =
+    (usesPeriod
+      ? Number(period !== DEFAULT_PERIOD) + Number(Boolean(selectedMonth)) + Number(Boolean(categoryId)) +
+        Number(Boolean(subcategoryId))
+      : 0) +
+    Number(includePending) +
+    Number(!ignoreTransfers);
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Análises</h1>
-        <p className="mt-1 text-sm text-ink-2">
-          Clique nos indicadores, nas barras e nas categorias para explorar os números.
-        </p>
-      </header>
-
-      <div className="flex gap-1 border-b border-line" role="tablist" aria-label="Seções de análise">
-        {(
-          [
-            ['overview', 'Visão geral'],
-            ['fixed', 'Custos fixos e equilíbrio'],
-            ['forecast', 'Contas a pagar'],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            onClick={() => setTab(key)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
-              tab === key ? 'border-accent text-ink' : 'border-transparent text-ink-2 hover:text-ink'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Filtros: uma linha só, acima de tudo que eles afetam. A previsão do
-          cartão não usa nenhum deles. */}
-      {tab !== 'forecast' && (
-        <div className="card flex flex-wrap items-center gap-x-5 gap-y-3 p-4">
-          {tab === 'overview' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-ink-2">Período</span>
-              <div className="flex rounded-lg border border-line p-0.5" role="radiogroup" aria-label="Período">
-                {PERIOD_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={period === option}
-                    onClick={() => {
-                      setPeriod(option);
-                      setSelectedMonth(null);
-                    }}
-                    className={`rounded-md px-3 py-1 text-sm transition ${
-                      period === option ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:text-ink'
-                    }`}
-                  >
-                    {option} meses
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <Toggle checked={includePending} onChange={setIncludePending} label="Incluir pendentes" />
-          <Toggle checked={ignoreTransfers} onChange={setIgnoreTransfers} label="Ignorar transferências" />
-
-          {tab === 'overview' && hasFilters && (
-            <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
-              {selectedMonth && (
-                <FilterChip
-                  label={formatMonthLabel(`${selectedMonth}-01`)}
-                  onClear={() => setSelectedMonth(null)}
-                />
+    <div className="page">
+      <PageHeader
+        title="Análises"
+        description="Escolha um indicador para ver a evolução dele mês a mês. Clicar nas barras dos gráficos também filtra a página."
+        actions={
+          // A previsão do cartão não usa nenhum filtro.
+          tab !== 'forecast' && (
+            <FiltersPopover open={filtersOpen} onOpenChange={setFiltersOpen} activeCount={activeFilters}>
+              {usesPeriod && (
+                <>
+                  <label className="block">
+                    <span className="label">Período (meses)</span>
+                    <PeriodInput
+                      value={period}
+                      onChange={(value) =>
+                        update({ periodo: value === DEFAULT_PERIOD ? null : String(value), mes: null })
+                      }
+                    />
+                    <span className="mt-1 block text-xs text-ink-3">
+                      {period === 1
+                        ? 'Compara o mês atual com o mês anterior.'
+                        : `Compara os últimos ${period} meses com os ${period} anteriores.`}
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="label">Mês</span>
+                    <select
+                      className="field py-1.5"
+                      value={selectedMonth ?? ''}
+                      onChange={(event) => update({ mes: event.target.value || null })}
+                    >
+                      <option value="">Todo o período</option>
+                      {view.monthOptions.map((option) => (
+                        <option key={option.key} value={option.key}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block min-w-0">
+                      <span className="label">Categoria</span>
+                      <select
+                        className="field py-1.5"
+                        value={categoryId ?? ''}
+                        // Trocar a categoria invalida a subcategoria escolhida antes.
+                        onChange={(event) => update({ categoria: event.target.value || null, subcategoria: null })}
+                      >
+                        <option value="">Todas</option>
+                        {view.categoryOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block min-w-0">
+                      <span className="label">Subcategoria</span>
+                      <select
+                        className="field py-1.5"
+                        value={subcategoryId ?? ''}
+                        disabled={!categoryId || view.subcategoryOptions.length === 0}
+                        onChange={(event) => update({ subcategoria: event.target.value || null })}
+                      >
+                        <option value="">Todas</option>
+                        {view.subcategoryOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </>
               )}
-              {category && <FilterChip label={category.name} onClear={() => setCategory(null)} />}
-            </div>
-          )}
-        </div>
-      )}
-
-      {transactions.length === 0 ? (
-        <div className="card">
-          <EmptyState
-            icon={BarChart3}
-            title="Ainda não há dados para analisar"
-            description="Concilie algumas transações e elas aparecem aqui."
-          />
-        </div>
-      ) : tab === 'fixed' ? (
-        <FixedCostsPanel report={view.fixedCosts} />
-      ) : tab === 'forecast' ? (
-        <CardForecastPanel forecast={view.forecast} />
-      ) : (
-        <>
-          {/* KPIs: clicar escolhe a métrica do gráfico de evolução */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Métrica do gráfico">
-            {METRICS.map((item) => (
-              <MetricKpi
-                key={item.key}
-                label={item.label}
-                icon={item.icon}
-                metric={item.key}
-                current={view.current}
-                previous={view.previous}
-                lowerIsBetter={item.lowerIsBetter}
-                selected={metric === item.key}
-                comparisonLabel={view.comparisonLabel}
-                onSelect={() => setMetric(item.key)}
-              />
-            ))}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <MiniStat label="Lançamentos no recorte" value={String(view.current.count)} />
-            <MiniStat label="Despesa média por lançamento" value={formatCurrency(view.current.averageExpense)} />
-          </div>
-
-          <section className="card p-5">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-base font-semibold text-ink">
-                {selectedMetric.label} por mês
-                {category && <span className="font-normal text-ink-2"> · {category.name}</span>}
-              </h2>
-              <p className="text-xs text-ink-3">Clique num mês para filtrar a página</p>
-            </div>
-            <MonthlyChart
-              data={view.monthly}
-              metric={metric}
-              selectedMonth={selectedMonth}
-              onSelect={(key) => setSelectedMonth(key === selectedMonth ? null : key)}
-            />
-          </section>
-
-          <BillsSection data={view.bills} />
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <section className="card p-5">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-base font-semibold text-ink">
-                  {category ? `Subcategorias de ${category.name}` : 'Despesas por categoria'}
-                </h2>
-                {category && (
-                  <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => setCategory(null)}>
-                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                    Todas
-                  </button>
-                )}
+              <div className="flex flex-col gap-2">
+                <Toggle checked={includePending} onChange={setIncludePending} label="Incluir pendentes" />
+                <Toggle checked={ignoreTransfers} onChange={setIgnoreTransfers} label="Ignorar transferências" />
               </div>
-              <p className="mt-1 text-xs text-ink-3">
-                {category ? 'Gasto dentro da categoria escolhida.' : 'Clique numa categoria para abrir as subcategorias.'}
-              </p>
-              <RankingChart
-                data={view.ranking}
-                onSelect={
-                  category
-                    ? undefined
-                    : (item) => item.id !== null && setCategory({ id: item.id, name: item.name })
-                }
-              />
-            </section>
+              {usesPeriod && hasScopeFilters && (
+                <button
+                  type="button"
+                  className="btn-secondary min-h-8 w-full py-1 text-xs"
+                  onClick={() => update({ periodo: null, mes: null, categoria: null, subcategoria: null })}
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </FiltersPopover>
+          )
+        }
+      />
 
-            <section className="card p-5">
-              <h2 className="text-base font-semibold text-ink">Onde mais gastei</h2>
-              <p className="mt-1 text-xs text-ink-3">Estabelecimentos agrupados pela descrição.</p>
-              <RankingChart data={view.merchants} />
-            </section>
-          </div>
+      <TabList active={tab} onChange={(next) => update({ aba: next === 'overview' ? null : next }, true)} />
 
-          <section className="space-y-3">
-            <h2 className="text-base font-semibold text-ink">Transações do recorte</h2>
-            {view.rows.length === 0 ? (
-              <div className="card p-6 text-center text-sm text-ink-3">Nenhuma transação neste recorte.</div>
-            ) : (
+      <div
+        key={tab}
+        id={`painel-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`aba-${tab}`}
+        className={`page-fill ${tabDirection}`}
+      >
+        {/* O recorte em uso fica sempre à vista, mesmo com os filtros recolhidos. */}
+        {usesPeriod && (
+          <p className="shrink-0 text-sm text-ink-2">
+            Mostrando <span className="font-medium text-ink">{view.scopeLabel}</span>
+            {view.filterName && (
               <>
-                <TransactionsTable transactions={pagination.pageItems} />
-                <Pagination state={pagination} noun="transações" />
+                {' '}
+                em <span className="font-medium text-ink">{view.filterName}</span>
               </>
             )}
-          </section>
-        </>
+            <span className="text-ink-3"> {view.comparisonLabel}</span>
+            {' · '}
+            {includePending ? 'aprovadas e pendentes' : 'só aprovadas'}
+            {ignoreTransfers ? ' · sem transferências' : ''}
+            {hasScopeFilters && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  className="font-medium text-ink underline underline-offset-4 hover:text-accent"
+                  onClick={() => update({ periodo: null, mes: null, categoria: null, subcategoria: null })}
+                >
+                  Limpar filtros
+                </button>
+              </>
+            )}
+          </p>
+        )}
+
+        {transactions.length === 0 ? (
+          <div className="card page-fill justify-center">
+            <EmptyState
+              icon={BarChart3}
+              title="Ainda não há dados para analisar"
+              description="Concilie algumas transações e elas aparecem aqui."
+            />
+          </div>
+        ) : tab === 'fixed' ? (
+          <FixedCostsPanel report={view.fixedCosts} />
+        ) : tab === 'forecast' ? (
+          <CardForecastPanel forecast={view.forecast} />
+        ) : tab === 'gastos' ? (
+          <div className="page-grid lg:grid-cols-2 lg:grid-rows-1">
+            <section className="panel">
+              <h2 className="shrink-0 text-sm font-semibold text-ink">Onde mais gastei</h2>
+              <p className="shrink-0 text-xs text-ink-2">Estabelecimentos agrupados pela descrição.</p>
+              <div className="scroll-y">
+                <RankingChart data={view.merchants} />
+              </div>
+            </section>
+            <BillsSection data={view.bills} />
+          </div>
+        ) : tab === 'transacoes' ? (
+          view.rows.length === 0 ? (
+            <div className="card p-6 text-center text-sm text-ink-2">Nenhuma transação neste recorte.</div>
+          ) : (
+            <>
+              <TransactionsTable transactions={pagination.pageItems} />
+              <Pagination state={pagination} noun="transações" />
+            </>
+          )
+        ) : (
+          <>
+            {/* Indicadores: escolher um troca a métrica do gráfico de evolução */}
+            <div className="grid shrink-0 gap-4 xl:grid-cols-4">
+              <RadioCards
+                className="xl:col-span-3"
+                label="Métrica do gráfico"
+                value={metric}
+                onChange={(next) => update({ metrica: next === 'expense' ? null : next })}
+                items={METRICS.map((item) => ({
+                  key: item.key,
+                  render: (selected: boolean) => (
+                    <MetricKpi
+                      label={item.label}
+                      icon={item.icon}
+                      metric={item.key}
+                      current={view.current}
+                      previous={view.previous}
+                      lowerIsBetter={item.lowerIsBetter}
+                      selected={selected}
+                      comparisonLabel={view.comparisonLabel}
+                    />
+                  ),
+                }))}
+              />
+              <ExpenseChangeKpi
+                current={view.current.expense}
+                previous={view.previous.expense}
+                filterName={view.filterName}
+                comparisonLabel={view.comparisonLabel}
+              />
+              <p className="text-xs text-ink-2 xl:col-span-4">
+                {view.current.count} {view.current.count === 1 ? 'lançamento' : 'lançamentos'} no recorte · despesa
+                média de {formatCurrency(view.current.averageExpense)} por lançamento
+              </p>
+            </div>
+
+            <div className="page-grid lg:grid-cols-5 lg:grid-rows-1">
+              <section className="panel lg:col-span-3">
+                <div className="flex shrink-0 flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-ink">
+                    {selectedMetric.label} por mês
+                    {view.categoryName && <span className="font-normal text-ink-2"> · {view.categoryName}</span>}
+                  </h2>
+                  <p className="text-xs text-ink-2">Clique num mês para filtrar a página</p>
+                </div>
+                <div className="chart-box">
+                  <MonthlyChart
+                    data={view.monthly}
+                    metric={metric}
+                    selectedMonth={selectedMonth}
+                    onSelect={(key) => update({ mes: key === selectedMonth ? null : key })}
+                  />
+                </div>
+              </section>
+
+              <section className="panel lg:col-span-2">
+                <div className="flex shrink-0 items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-ink">
+                    {view.categoryName ? `Subcategorias de ${view.categoryName}` : 'Despesas por categoria'}
+                  </h2>
+                  {categoryId && (
+                    <button
+                      type="button"
+                      className="btn-secondary min-h-8 px-2.5 py-1 text-xs"
+                      onClick={() => update({ categoria: null, subcategoria: null })}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                      Todas
+                    </button>
+                  )}
+                </div>
+                <p className="shrink-0 text-xs text-ink-2">
+                  {categoryId
+                    ? subcategoryId
+                      ? 'Gasto na subcategoria escolhida.'
+                      : 'Clique numa subcategoria para filtrar a página.'
+                    : 'Clique numa categoria para abrir as subcategorias.'}
+                </p>
+                <div className="scroll-y">
+                  <RankingChart
+                    data={view.ranking}
+                    onSelect={
+                      subcategoryId
+                        ? undefined
+                        : (item) =>
+                            item.id !== null &&
+                            update(categoryId ? { subcategoria: item.id } : { categoria: item.id, subcategoria: null })
+                    }
+                  />
+                </div>
+              </section>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Abas com setas ←/→, Home e End (padrão WAI-ARIA de abas). */
+function TabList({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  // Mede a aba ativa para o sublinhado deslizar até ela (e acompanhar
+  // mudanças de largura, como a tela girando no celular).
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      const button = list.querySelector<HTMLElement>(`#aba-${active}`);
+      if (button) setIndicator({ left: button.offsetLeft, width: button.offsetWidth });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [active]);
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const index = TABS.findIndex(([key]) => key === active);
+    const keys: Record<string, number> = {
+      ArrowRight: (index + 1) % TABS.length,
+      ArrowLeft: (index - 1 + TABS.length) % TABS.length,
+      Home: 0,
+      End: TABS.length - 1,
+    };
+    const nextIndex = keys[event.key];
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    onChange(TABS[nextIndex][0]);
+    document.getElementById(`aba-${TABS[nextIndex][0]}`)?.focus();
+  }
+
+  return (
+    <div
+      ref={listRef}
+      className="relative flex gap-1 overflow-x-auto border-b border-line"
+      role="tablist"
+      aria-label="Seções de análise"
+      onKeyDown={onKeyDown}
+    >
+      {TABS.map(([key, label]) => (
+        <button
+          key={key}
+          id={`aba-${key}`}
+          type="button"
+          role="tab"
+          aria-selected={active === key}
+          aria-controls={`painel-${key}`}
+          tabIndex={active === key ? 0 : -1}
+          onClick={() => onChange(key)}
+          className={`min-h-11 shrink-0 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors sm:px-4 ${
+            active === key ? 'text-ink' : 'text-ink-2 hover:text-ink'
+          }`}
+        >
+          <span className="sm:hidden">{SHORT_TAB_LABELS[key]}</span>
+          <span className="hidden sm:inline">{label}</span>
+        </button>
+      ))}
+      {indicator && (
+        <span
+          aria-hidden
+          className="absolute bottom-0 left-0 h-0.5 rounded-full bg-accent transition-[transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+          style={{ width: indicator.width, transform: `translateX(${indicator.left}px)` }}
+        />
       )}
+    </div>
+  );
+}
+
+/** Setas trocam a opção selecionada e levam o foco junto (padrão WAI-ARIA de radio). */
+function arrowSelect<T extends string>(
+  event: KeyboardEvent<HTMLElement>,
+  values: T[],
+  current: T,
+  onChange: (value: T) => void,
+) {
+  const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+  const backward = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+  if (!forward && !backward) return;
+  event.preventDefault();
+  const step = forward ? 1 : -1;
+  const next = values[(values.indexOf(current) + step + values.length) % values.length];
+  onChange(next);
+  event.currentTarget.querySelector<HTMLElement>(`[data-value="${next}"]`)?.focus();
+}
+
+function RadioCards<T extends string>({
+  label,
+  value,
+  onChange,
+  items,
+  className = '',
+}: {
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  items: { key: T; render: (selected: boolean) => ReactNode }[];
+  className?: string;
+}) {
+  return (
+    <div
+      className={`grid gap-4 sm:grid-cols-3 ${className}`}
+      role="radiogroup"
+      aria-label={label}
+      onKeyDown={(event) => arrowSelect(event, items.map((item) => item.key), value, onChange)}
+    >
+      {items.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          role="radio"
+          aria-checked={value === item.key}
+          tabIndex={value === item.key ? 0 : -1}
+          data-value={item.key}
+          onClick={() => onChange(item.key)}
+          className="rounded-xl text-left"
+        >
+          {item.render(value === item.key)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface FiltersPopoverProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activeCount: number;
+  children: ReactNode;
+}
+
+/**
+ * Filtros recolhidos num botão no canto superior direito. Abrem num painel
+ * suspenso, sem empurrar a página; fecham com Esc ou clicando fora.
+ */
+function FiltersPopover({ open, onOpenChange, activeCount, children }: FiltersPopoverProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) onOpenChange(false);
+    }
+    function onKey(event: globalThis.KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      onOpenChange(false);
+      buttonRef.current?.focus();
+    }
+    document.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={containerRef} className="relative ml-auto">
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`btn-secondary ${open ? 'border-accent text-ink' : ''}`}
+        onClick={() => onOpenChange(!open)}
+        aria-expanded={open}
+        aria-controls="filtros-analises"
+      >
+        <SlidersHorizontal className="h-4 w-4" aria-hidden />
+        Filtros
+        {activeCount > 0 && (
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs font-semibold text-accent-ink tabular-nums">
+            {activeCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div
+          id="filtros-analises"
+          role="group"
+          aria-label="Filtros"
+          className="animate-fade absolute top-full right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-xl border border-line bg-surface p-4 shadow-2xl"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-ink">Filtros</p>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="-m-1.5 grid h-7 w-7 place-items-center rounded-md text-ink-3 transition hover:bg-surface-2 hover:text-ink"
+              aria-label="Recolher filtros"
+              title="Recolher filtros"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Número de meses. Aplica ao sair do campo ou com Enter, para não recalcular a cada tecla. */
+function PeriodInput({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  function commit() {
+    const parsed = Math.round(Number(draft));
+    const next = Number.isFinite(parsed) ? Math.min(MAX_PERIOD, Math.max(1, parsed)) : value;
+    setDraft(String(next));
+    if (next !== value) onChange(next);
+  }
+
+  return (
+    <input
+      type="number"
+      className="field py-1.5"
+      min={1}
+      max={MAX_PERIOD}
+      step={1}
+      inputMode="numeric"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') commit();
+      }}
+    />
+  );
+}
+
+/**
+ * As despesas do recorte (período, categoria e subcategoria filtrados)
+ * subiram, ficaram iguais ou caíram em relação ao período anterior?
+ */
+function ExpenseChangeKpi({
+  current,
+  previous,
+  filterName,
+  comparisonLabel,
+}: {
+  current: number;
+  previous: number;
+  filterName: string | null;
+  comparisonLabel: string;
+}) {
+  const change = previous > 0 ? ((current - previous) / previous) * 100 : null;
+  const isFlat = change !== null && Math.abs(change) < 0.5;
+  const verdict =
+    change === null ? 'Sem base de comparação' : isFlat ? 'Manteve' : change > 0 ? 'Aumentou' : 'Diminuiu';
+  // Despesa subindo é ruim, caindo é bom.
+  const tone =
+    change === null || isFlat ? 'text-ink' : change > 0 ? 'text-danger-ink' : 'text-success-ink';
+  const Icon = change === null || isFlat ? Minus : change > 0 ? ArrowUpRight : ArrowDownRight;
+
+  return (
+    <div className="card h-full p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-medium text-ink-2" title={filterName ?? undefined}>
+          Variação das despesas{filterName ? ` · ${filterName}` : ''}
+        </p>
+        <Percent className="h-4 w-4 shrink-0 text-ink-3" aria-hidden />
+      </div>
+      <p className={`mt-1.5 flex items-center gap-1 text-2xl font-semibold num ${tone}`}>
+        {change !== null && <Icon className="h-5 w-5" aria-hidden />}
+        {change === null ? '—' : `${change > 0 ? '+' : change < 0 && !isFlat ? '−' : ''}${Math.abs(change).toFixed(isFlat ? 0 : 1).replace('.', ',')}%`}
+      </p>
+      {/* Os períodos comparados ficam no título (passe o mouse) e na linha "Mostrando…". */}
+      <p className="mt-1 text-xs text-ink-2" title={comparisonLabel}>
+        <span className={`font-medium ${tone}`}>{verdict}</span>
+        {change !== null && (
+          <span className="tabular-nums">
+            {' · '}
+            {formatCurrency(current)} vs. {formatCurrency(previous)}
+          </span>
+        )}
+      </p>
     </div>
   );
 }
@@ -343,22 +841,6 @@ function Toggle({
   );
 }
 
-function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 py-0.5 pr-1 pl-3 text-xs font-medium text-ink">
-      {label}
-      <button
-        type="button"
-        onClick={onClear}
-        className="rounded-full p-0.5 text-ink-3 hover:text-ink"
-        aria-label={`Remover filtro ${label}`}
-      >
-        <X className="h-3.5 w-3.5" aria-hidden />
-      </button>
-    </span>
-  );
-}
-
 function MetricKpi({
   label,
   icon: Icon,
@@ -368,7 +850,6 @@ function MetricKpi({
   lowerIsBetter = false,
   selected,
   comparisonLabel,
-  onSelect,
 }: {
   label: string;
   icon: LucideIcon;
@@ -378,7 +859,6 @@ function MetricKpi({
   lowerIsBetter?: boolean;
   selected: boolean;
   comparisonLabel: string;
-  onSelect: () => void;
 }) {
   const value = metricValue(current, metric);
   const before = metricValue(previous, metric);
@@ -391,24 +871,20 @@ function MetricKpi({
   }
 
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      className={`card p-5 text-left transition ${
-        selected
-          ? 'border-accent bg-surface-2 outline-2 outline-accent'
-          : 'hover:border-ink-3'
+    // Selecionado = borda e contorno da marca, mesmo fundo dos outros: no
+    // fundo mais escuro o texto vermelho de variação ficava sem contraste.
+    <div
+      className={`card h-full p-4 transition ${
+        selected ? 'border-accent outline-2 outline-accent' : 'hover:border-ink-3'
       }`}
     >
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-ink-2">{label}</p>
         <Icon className="h-4 w-4 text-ink-3" aria-hidden />
       </div>
-      <p className="mt-2 text-2xl font-semibold text-ink tabular-nums">{formatMetric(metric, value)}</p>
+      <p className="mt-1.5 text-2xl font-semibold text-ink num">{formatMetric(metric, value)}</p>
       <Delta value={delta} unit={metric === 'savings' ? 'p.p.' : '%'} lowerIsBetter={lowerIsBetter} label={comparisonLabel} />
-    </button>
+    </div>
   );
 }
 
@@ -424,7 +900,7 @@ function Delta({
   label: string;
 }) {
   if (value === null) {
-    return <p className="mt-1 text-xs text-ink-3">sem base de comparação</p>;
+    return <p className="mt-1 text-xs text-ink-2">sem base de comparação</p>;
   }
 
   const isFlat = Math.abs(value) < 0.5;
@@ -437,17 +913,8 @@ function Delta({
     <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${tone}`}>
       <Icon className="h-3.5 w-3.5" aria-hidden />
       {isFlat ? 'estável' : `${Math.abs(value).toFixed(0)} ${unit}`}
-      <span className="font-normal text-ink-3">{label}</span>
+      <span className="font-normal text-ink-2">{label}</span>
     </p>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="card flex items-center justify-between px-5 py-3">
-      <span className="text-sm text-ink-2">{label}</span>
-      <span className="text-base font-semibold text-ink tabular-nums">{value}</span>
-    </div>
   );
 }
 
@@ -467,7 +934,7 @@ function MonthlyChart({
     metric === 'savings' ? `${value.toFixed(0)}%` : formatCurrencyCompact(value);
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={data}
         margin={{ top: 20, right: 8, bottom: 0, left: 8 }}
@@ -495,7 +962,7 @@ function MonthlyChart({
             active && payload?.length ? (
               <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
                 <p className="mb-1 font-semibold text-ink first-letter:uppercase">{label}</p>
-                <p className="font-medium text-ink tabular-nums">
+                <p className="font-medium text-ink num">
                   {payload[0].value === null || payload[0].value === undefined
                     ? '—'
                     : metric === 'savings'
@@ -545,57 +1012,99 @@ function RankingChart({
   }
 
   const height = Math.max(200, data.length * 34 + 24);
+  const max = Math.max(...data.map((item) => item.total), 1);
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} layout="vertical" margin={{ top: 8, right: 96, bottom: 0, left: 8 }} barCategoryGap={6}>
-        <XAxis type="number" hide />
-        <YAxis
-          type="category"
-          dataKey="name"
-          tick={AXIS_TICK}
-          tickLine={false}
-          axisLine={{ stroke: CHART_COLORS.axis }}
-          width={150}
-        />
-        <Tooltip
-          cursor={{ fill: CHART_COLORS.cursor }}
-          content={({ active, payload }) => {
-            const item = payload?.[0]?.payload as RankedItem | undefined;
-            return active && item ? (
-              <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
-                <p className="mb-1 font-semibold text-ink">{item.name}</p>
-                <p className="font-medium text-ink tabular-nums">{formatCurrency(item.total)}</p>
-                <p className="text-ink-3">{(item.share * 100).toFixed(1)}% das despesas</p>
-                {onSelect && item.id && <p className="mt-1 text-ink-3">Clique para ver subcategorias</p>}
-              </div>
-            ) : null;
-          }}
-        />
-        <Bar
-          dataKey="total"
-          fill={CHART_COLORS.single}
-          radius={[0, 4, 4, 0]}
-          maxBarSize={20}
-          isAnimationActive={false}
-          cursor={onSelect ? 'pointer' : undefined}
-          onClick={
-            onSelect
-              ? (entry: { payload?: RankedItem }) => entry.payload && onSelect(entry.payload)
-              : undefined
-          }
-        >
-          <LabelList
-            dataKey="total"
-            position="right"
-            offset={8}
-            fill={CHART_COLORS.muted}
-            fontSize={12}
-            formatter={(value: number) => formatCurrency(value)}
-          />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <>
+      {/* Celular: lista com barras finas. O gráfico, com o nome no eixo,
+          deixava as barras com poucos pixels numa tela estreita. */}
+      <ul className="mt-3 space-y-2.5 sm:hidden">
+        {data.map((item) => {
+          const content = (
+            <>
+              <span className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="min-w-0 truncate text-ink">{item.name}</span>
+                <span className="shrink-0 font-medium text-ink num">{formatCurrency(item.total)}</span>
+              </span>
+              <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+                <span
+                  className="block h-full rounded-full bg-series-1"
+                  style={{ width: `${Math.max(2, (item.total / max) * 100)}%` }}
+                />
+              </span>
+              <span className="mt-0.5 block text-xs text-ink-2">{(item.share * 100).toFixed(1)}% das despesas</span>
+            </>
+          );
+          const clickable = onSelect && item.id !== null;
+          return (
+            <li key={item.id ?? item.name}>
+              {clickable ? (
+                <button
+                  type="button"
+                  className="block min-h-11 w-full rounded-md text-left"
+                  onClick={() => onSelect(item)}
+                >
+                  {content}
+                </button>
+              ) : (
+                <div>{content}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="hidden sm:block">
+        <ResponsiveContainer width="100%" height={height}>
+          <BarChart data={data} layout="vertical" margin={{ top: 8, right: 96, bottom: 0, left: 8 }} barCategoryGap={6}>
+            <XAxis type="number" hide />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={{ stroke: CHART_COLORS.axis }}
+              width={150}
+            />
+            <Tooltip
+              cursor={{ fill: CHART_COLORS.cursor }}
+              content={({ active, payload }) => {
+                const item = payload?.[0]?.payload as RankedItem | undefined;
+                return active && item ? (
+                  <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
+                    <p className="mb-1 font-semibold text-ink">{item.name}</p>
+                    <p className="font-medium text-ink num">{formatCurrency(item.total)}</p>
+                    <p className="text-ink-3">{(item.share * 100).toFixed(1)}% das despesas</p>
+                    {onSelect && item.id && <p className="mt-1 text-ink-3">Clique para ver subcategorias</p>}
+                  </div>
+                ) : null;
+              }}
+            />
+            <Bar
+              dataKey="total"
+              fill={CHART_COLORS.single}
+              radius={[0, 4, 4, 0]}
+              maxBarSize={20}
+              isAnimationActive={false}
+              cursor={onSelect ? 'pointer' : undefined}
+              onClick={
+                onSelect
+                  ? (entry: { payload?: RankedItem }) => entry.payload && onSelect(entry.payload)
+                  : undefined
+              }
+            >
+              <LabelList
+                dataKey="total"
+                position="right"
+                offset={8}
+                fill={CHART_COLORS.muted}
+                fontSize={12}
+                formatter={(value: number) => formatCurrency(value)}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </>
   );
 }
 
@@ -605,16 +1114,16 @@ function BillsSection({ data }: { data: { key: string; label: string; value: num
   const average = paid.length ? total / paid.length : 0;
 
   return (
-    <section className="card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-semibold text-ink">Faturas pagas por mês</h2>
+    <section className="panel">
+      <div className="flex shrink-0 flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink">Faturas pagas por mês</h2>
         {paid.length > 0 && (
-          <p className="text-sm text-ink-2 tabular-nums">
+          <p className="text-sm text-ink-2 num">
             Total {formatCurrency(total)} · média {formatCurrency(average)}/mês
           </p>
         )}
       </div>
-      <p className="mt-1 text-xs text-ink-3">
+      <p className="mt-1 shrink-0 text-xs text-ink-3">
         Pagamentos de fatura do cartão. Ficam fora das despesas para não contar em dobro: o gasto já
         entra em cada compra do cartão.
       </p>
@@ -622,48 +1131,50 @@ function BillsSection({ data }: { data: { key: string; label: string; value: num
       {paid.length === 0 ? (
         <p className="py-10 text-center text-sm text-ink-3">Nenhum pagamento de fatura no período.</p>
       ) : (
-        <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={data} margin={{ top: 20, right: 8, bottom: 0, left: 8 }}>
-            <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: CHART_COLORS.axis }} />
-            <YAxis
-              tick={AXIS_TICK}
-              tickLine={false}
-              axisLine={false}
-              width={64}
-              tickFormatter={(value: number) => formatCurrencyCompact(value)}
-            />
-            <Tooltip
-              cursor={{ fill: CHART_COLORS.cursor }}
-              content={({ active, payload, label }) =>
-                active && payload?.length ? (
-                  <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
-                    <p className="mb-1 font-semibold text-ink first-letter:uppercase">{label}</p>
-                    <p className="font-medium text-ink tabular-nums">
-                      {formatCurrency(Number(payload[0].value))}
-                    </p>
-                  </div>
-                ) : null
-              }
-            />
-            <Bar
-              dataKey="value"
-              name="Fatura paga"
-              fill={CHART_COLORS.expense}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={36}
-              isAnimationActive={false}
-            >
-              <LabelList
-                dataKey="value"
-                position="top"
-                fill={CHART_COLORS.muted}
-                fontSize={11}
-                formatter={(value: number) => (value > 0 ? formatCurrencyCompact(value) : '')}
+        <div className="chart-box">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 20, right: 8, bottom: 0, left: 8 }}>
+              <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+              <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: CHART_COLORS.axis }} />
+              <YAxis
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={false}
+                width={64}
+                tickFormatter={(value: number) => formatCurrencyCompact(value)}
               />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+              <Tooltip
+                cursor={{ fill: CHART_COLORS.cursor }}
+                content={({ active, payload, label }) =>
+                  active && payload?.length ? (
+                    <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
+                      <p className="mb-1 font-semibold text-ink first-letter:uppercase">{label}</p>
+                      <p className="font-medium text-ink num">
+                        {formatCurrency(Number(payload[0].value))}
+                      </p>
+                    </div>
+                  ) : null
+                }
+              />
+              <Bar
+                dataKey="value"
+                name="Fatura paga"
+                fill={CHART_COLORS.expense}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={36}
+                isAnimationActive={false}
+              >
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  fill={CHART_COLORS.muted}
+                  fontSize={11}
+                  formatter={(value: number) => (value > 0 ? formatCurrencyCompact(value) : '')}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </section>
   );

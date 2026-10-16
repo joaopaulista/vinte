@@ -20,7 +20,7 @@ export interface CashflowPoint {
 
 export function CashflowChart({ data }: { data: CashflowPoint[] }) {
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }} barGap={2}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
         <XAxis
@@ -50,7 +50,7 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
           name="Entradas"
           fill={CHART_COLORS.income}
           radius={[4, 4, 0, 0]}
-          maxBarSize={22}
+          maxBarSize={32}
           isAnimationActive={false}
         />
         <Bar
@@ -58,7 +58,7 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
           name="Saídas"
           fill={CHART_COLORS.expense}
           radius={[4, 4, 0, 0]}
-          maxBarSize={22}
+          maxBarSize={32}
           isAnimationActive={false}
         />
       </BarChart>

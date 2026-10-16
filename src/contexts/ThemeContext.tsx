@@ -52,7 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     // Pinta a barra de endereço do navegador no mobile com a cor da página.
     const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute('content', theme === 'dark' ? '#14273f' : '#f8f6f2');
+    meta?.setAttribute('content', theme === 'dark' ? '#082623' : '#f3f5f4');
   }, [theme]);
 
   const setPreference = useCallback((next: ThemePreference) => {

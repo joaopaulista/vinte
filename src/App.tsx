@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { AppLayout } from '@/components/common/AppLayout';
 import { MissingConfig } from '@/components/common/MissingConfig';
 import { isSupabaseConfigured } from '@/services/supabaseClient';
-import Dashboard from '@/pages/Dashboard';
+import Home from '@/pages/Home';
 import Transactions from '@/pages/Transactions';
 import Reconciliation from '@/pages/Reconciliation';
 import Accounts from '@/pages/Accounts';
@@ -42,7 +42,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<Home />} />
               <Route path="/analises" element={<Analytics />} />
               <Route path="/conciliacao" element={<Reconciliation />} />
               <Route path="/transacoes" element={<Transactions />} />

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
+/** Teto de registros por página em todas as listas do app. */
+export const MAX_PAGE_SIZE = 10;
+
 export interface PaginationState<T> {
   pageItems: T[];
   page: number;
@@ -7,7 +10,6 @@ export interface PaginationState<T> {
   pageSize: number;
   total: number;
   setPage: (page: number) => void;
-  setPageSize: (size: number) => void;
 }
 
 /**
@@ -15,9 +17,9 @@ export interface PaginationState<T> {
  * e a página atual deixa de existir, cai para a última página válida em vez
  * de mostrar uma página vazia.
  */
-export function usePagination<T>(items: T[], initialPageSize = 20): PaginationState<T> {
+export function usePagination<T>(items: T[], requestedPageSize = MAX_PAGE_SIZE): PaginationState<T> {
+  const pageSize = Math.min(requestedPageSize, MAX_PAGE_SIZE);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(initialPageSize);
 
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   const safePage = Math.min(page, pageCount);
@@ -38,9 +40,5 @@ export function usePagination<T>(items: T[], initialPageSize = 20): PaginationSt
     pageSize,
     total: items.length,
     setPage: (next) => setPage(Math.min(Math.max(1, next), pageCount)),
-    setPageSize: (size) => {
-      setPageSize(size);
-      setPage(1);
-    },
   };
 }

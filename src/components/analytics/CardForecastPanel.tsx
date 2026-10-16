@@ -18,11 +18,11 @@ import { formatCurrency, formatCurrencyCompact, formatMonthLabel } from '@/utils
 import type { CardForecast } from '@/utils/cardForecast';
 
 export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
-  const pagination = usePagination(forecast.purchases, 10);
+  const pagination = usePagination(forecast.purchases);
 
   if (!forecast.hasCard) {
     return (
-      <div className="card">
+      <div className="card page-fill justify-center">
         <EmptyState
           icon={CreditCard}
           title="Nenhum cartão de crédito conectado"
@@ -36,9 +36,10 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
   const currentTotal = current ? current.posted + current.projected : 0;
 
   return (
-    <div className="space-y-6">
-      <section className="card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+    // Desktop: faturas (gráfico) à esquerda, compras parceladas à direita.
+    <div className="page-grid lg:grid-cols-2 lg:grid-rows-1">
+      <section className="panel">
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-ink">Faturas</h2>
             <p className="mt-1 text-sm text-ink-2">
@@ -49,25 +50,25 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
           <div className="flex flex-wrap gap-6 text-right">
             <div>
               <p className="text-xs text-ink-2">Média dos meses anteriores</p>
-              <p className="text-lg font-semibold text-ink tabular-nums">
+              <p className="text-lg font-semibold text-ink num">
                 {forecast.pastAverage > 0 ? formatCurrency(forecast.pastAverage) : '—'}
               </p>
             </div>
             <div>
               <p className="text-xs text-ink-2">Fatura deste mês</p>
-              <p className="text-lg font-semibold text-ink tabular-nums">{formatCurrency(currentTotal)}</p>
+              <p className="text-lg font-semibold text-ink num">{formatCurrency(currentTotal)}</p>
             </div>
             <div>
               <p className="text-xs text-ink-2">Parcelas a vencer</p>
-              <p className="text-lg font-semibold text-ink tabular-nums">
+              <p className="text-lg font-semibold text-ink num">
                 {formatCurrency(forecast.remainingTotal)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="mt-4">
-          <ResponsiveContainer width="100%" height={280}>
+        <div className="chart-box mt-3">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={forecast.months} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
               <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
               <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: CHART_COLORS.axis }} />
@@ -142,7 +143,7 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
           </ResponsiveContainer>
         </div>
 
-        <p className="mt-3 flex gap-2 text-xs text-ink-3">
+        <p className="mt-3 flex shrink-0 gap-2 text-xs text-ink-3">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           As parcelas previstas são projetadas a partir da última parcela que o banco mandou de cada
           compra. O histórico vai até onde a sincronização alcança (cerca de 3 meses). Compras da
@@ -150,8 +151,8 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
         </p>
       </section>
 
-      <section className="space-y-3">
-        <div>
+      <section className="flex min-w-0 flex-col gap-3 lg:min-h-0">
+        <div className="shrink-0">
           <h2 className="text-base font-semibold text-ink">Compras parceladas</h2>
           <p className="mt-1 text-sm text-ink-2">Em qual parcela cada compra está e quanto ainda falta.</p>
         </div>
@@ -162,40 +163,40 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
           </div>
         ) : (
           <>
-            <div className="card overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left text-xs font-semibold tracking-wide text-ink-2 uppercase">
-                    <th className="px-4 py-3">Compra</th>
-                    <th className="px-4 py-3 text-center">Parcela</th>
-                    <th className="px-4 py-3 text-right">Valor da parcela</th>
-                    <th className="px-4 py-3 text-center">Faltam</th>
-                    <th className="px-4 py-3">Última parcela</th>
-                    <th className="px-4 py-3 text-right">A pagar</th>
+            <div className="card overflow-auto overscroll-contain lg:min-h-0">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead className="sticky top-0 z-10 bg-surface [&_th]:shadow-[inset_0_-1px_0_var(--vinte-line)]">
+                  <tr className="text-left text-xs font-semibold tracking-wide text-ink-2 uppercase">
+                    <th className="px-3 py-2.5">Compra</th>
+                    <th className="px-3 py-2.5 text-center">Parcela</th>
+                    <th className="px-3 py-2.5 text-right">Valor da parcela</th>
+                    <th className="px-3 py-2.5 text-center">Faltam</th>
+                    <th className="px-3 py-2.5">Última parcela</th>
+                    <th className="px-3 py-2.5 text-right">A pagar</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
                   {pagination.pageItems.map((purchase) => (
                     <tr key={purchase.key} className="hover:bg-surface-2">
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <p className="font-medium text-ink">{purchase.name}</p>
                         {purchase.accountName && <p className="text-xs text-ink-3">{purchase.accountName}</p>}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="rounded-full border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-2 tabular-nums">
+                      <td className="px-3 py-2.5 text-center">
+                        <span className="rounded-full border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-2 num">
                           {purchase.current}/{purchase.total}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-ink-2 tabular-nums">
+                      <td className="px-3 py-2.5 text-right text-ink-2 num">
                         {formatCurrency(purchase.installmentValue)}
                       </td>
-                      <td className="px-4 py-3 text-center text-ink-2 tabular-nums">
+                      <td className="px-3 py-2.5 text-center text-ink-2 num">
                         {purchase.remaining === 0 ? 'última' : purchase.remaining}
                       </td>
-                      <td className="px-4 py-3 text-ink-2">
+                      <td className="px-3 py-2.5 text-ink-2">
                         {formatMonthLabel(`${purchase.lastMonth}-01`)}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-ink tabular-nums">
+                      <td className="px-3 py-2.5 text-right font-medium text-ink num">
                         {formatCurrency(purchase.remainingTotal)}
                       </td>
                     </tr>
@@ -203,7 +204,7 @@ export function CardForecastPanel({ forecast }: { forecast: CardForecast }) {
                 </tbody>
               </table>
             </div>
-            <Pagination state={pagination} noun="compras" hideSizeSelector />
+            <Pagination state={pagination} noun="compras" />
           </>
         )}
       </section>
@@ -216,7 +217,7 @@ function TooltipRow({ color, label, value }: { color: string; label: string; val
     <p className="flex items-center gap-2 text-ink-2">
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />
       <span>{label}</span>
-      <span className="ml-auto pl-3 font-medium text-ink tabular-nums">{formatCurrency(value)}</span>
+      <span className="ml-auto pl-3 font-medium text-ink num">{formatCurrency(value)}</span>
     </p>
   );
 }

@@ -5,6 +5,7 @@ import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { Pagination } from '@/components/common/Pagination';
+import { PageHeader } from '@/components/common/PageHeader';
 import { usePagination } from '@/hooks/usePagination';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
@@ -27,7 +28,7 @@ export default function Transactions() {
   const { tree } = useCategories();
   const { refreshPendingCount } = usePendingCount();
   const [reopeningId, setReopeningId] = useState<string | null>(null);
-  const pagination = usePagination(transactions, 20);
+  const pagination = usePagination(transactions);
 
   const totals = useMemo(() => {
     let income = 0;
@@ -54,13 +55,22 @@ export default function Transactions() {
   }
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Transações</h1>
-        <p className="mt-1 text-sm text-ink-2">
-          Todas as movimentações sincronizadas, em qualquer status.
-        </p>
-      </header>
+    <div className="page">
+      <PageHeader
+        title="Transações"
+        description="Todas as movimentações sincronizadas, em qualquer status."
+        actions={
+          !loading &&
+          !error &&
+          transactions.length > 0 && (
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 text-right">
+              <SummaryTile label="Entradas no filtro" value={totals.income} tone="text-success-ink" />
+              <SummaryTile label="Saídas no filtro" value={totals.expense} tone="text-ink" />
+              <SummaryTile label="Resultado" value={totals.balance} tone="text-ink" />
+            </dl>
+          )
+        }
+      />
 
       <TransactionFilters
         filters={filters}
@@ -74,7 +84,7 @@ export default function Transactions() {
       ) : error ? (
         <div className="card border-danger/30 bg-danger-surface p-4 text-sm text-danger-ink">{error}</div>
       ) : transactions.length === 0 ? (
-        <div className="card">
+        <div className="card page-fill justify-center">
           <EmptyState
             icon={ListOrdered}
             title="Nenhuma transação encontrada"
@@ -83,12 +93,6 @@ export default function Transactions() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <SummaryTile label="Entradas no filtro" value={totals.income} tone="text-success-ink" />
-            <SummaryTile label="Saídas no filtro" value={totals.expense} tone="text-ink" />
-            <SummaryTile label="Resultado" value={totals.balance} tone="text-ink" />
-          </div>
-
           <TransactionsTable
             transactions={pagination.pageItems}
             renderActions={(transaction) =>
@@ -116,9 +120,9 @@ export default function Transactions() {
 
 function SummaryTile({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="card p-4">
-      <p className="text-sm text-ink-2">{label}</p>
-      <p className={`mt-1 text-xl font-semibold ${tone}`}>{formatCurrency(value)}</p>
+    <div>
+      <dt className="text-xs text-ink-2">{label}</dt>
+      <dd className={`text-lg font-semibold num ${tone}`}>{formatCurrency(value)}</dd>
     </div>
   );
 }

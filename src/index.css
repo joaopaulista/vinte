@@ -1,24 +1,35 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
 
 /*
- * Paleta da marca VINTE
- *   Azul Petróleo  #1E3A5F
- *   Off White      #F8F6F2
- *   Dourado Suave  #D4A857
- *   Verde Sucesso  #2E8B57
+ * Identidade VINTE (Manual da Marca)
  *
- * Os quatro hexes são os tons "de assinatura" — bons para fundos, superfícies e
- * elementos grandes. Para texto pequeno e para séries de gráfico eles precisam
- * de degraus próprios (mais escuros no tema claro, mais claros no escuro), senão
- * o contraste cai abaixo do legível. Por isso existem os pares `*-ink`.
+ *   Principais   Verde Profundo #0D3B36 · Menta #3CCF9E · Névoa #F3F5F4
+ *   Apoio        Noite #082623 (texto e fundos escuros) · Musgo #5E7671 (texto
+ *                secundário) · Pedra #D5DDDA (divisores e bordas) · Coral
+ *                #E8664F (saídas e alertas)
+ *   Proporção    Névoa 55% · Verde Profundo 30% · Menta 10% · Coral 5%
+ *   Tipografia   Plus Jakarta Sans em tudo; valores sempre em IBM Plex Mono
+ *
+ * Regras do manual que o CSS precisa respeitar:
+ *   - Menta é destaque: sobre Verde Profundo ou como fundo para texto escuro.
+ *     Nunca como texto sobre fundo claro — para isso existe `success-ink`, um
+ *     degrau mais escuro da própria menta.
+ *   - Menta para entradas e confirmações; Coral para saídas e alertas.
+ *   - Coral, como texto pequeno sobre fundo claro, também precisa do degrau
+ *     escuro (`danger-ink`); o coral puro fica para preenchimentos.
  *
  * `@theme inline` faz os utilitários do Tailwind apontarem para as variáveis em
  * vez de congelarem o valor — é o que permite trocar o tema sem recompilar CSS.
  */
 @theme inline {
   --font-sans:
-    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
   --color-page: var(--vinte-page);
   --color-surface: var(--vinte-surface);
@@ -33,6 +44,19 @@
   --color-accent-hover: var(--vinte-accent-hover);
   --color-accent-ink: var(--vinte-accent-ink);
 
+  /* Botão de ação principal: Menta com texto Noite, como no manual */
+  --color-cta: var(--vinte-cta);
+  --color-cta-hover: var(--vinte-cta-hover);
+  --color-cta-ink: var(--vinte-cta-ink);
+
+  /* Cores fixas da marca, iguais nos dois temas (blocos de marca, logo) */
+  --color-deep: #0d3b36;
+  --color-night: #082623;
+  --color-mist: #f3f5f4;
+  --color-mist-2: #a9bcb7;
+
+  --color-mint: var(--vinte-mint);
+  --color-coral: var(--vinte-coral);
   --color-gold: var(--vinte-gold);
   --color-gold-ink: var(--vinte-gold-ink);
   --color-success: var(--vinte-success);
@@ -51,85 +75,96 @@
   --color-grid: var(--vinte-grid);
 }
 
-/* Tema claro (padrão) */
+/* Tema claro (padrão): Névoa de fundo, Verde Profundo no texto */
 :root {
   color-scheme: light;
 
-  --vinte-page: #f8f6f2;
+  --vinte-page: #f3f5f4;
   --vinte-surface: #ffffff;
-  --vinte-surface-2: #f2efe9;
-  --vinte-line: #e4dfd5;
+  --vinte-surface-2: #e9eeec;
+  --vinte-line: #d5ddda;
 
-  --vinte-ink: #1e3a5f;
-  --vinte-ink-2: #4a5f7a;
-  --vinte-ink-3: #6e7a8c;
+  --vinte-ink: #0d3b36;
+  --vinte-ink-2: #5e7671; /* Musgo */
+  --vinte-ink-3: #566e69; /* Musgo um degrau acima: ≥ 4,5:1 também sobre surface-2 */
 
-  --vinte-accent: #1e3a5f;
-  --vinte-accent-hover: #162c48;
-  --vinte-accent-ink: #f8f6f2;
+  --vinte-accent: #0d3b36;
+  --vinte-accent-hover: #082623;
+  --vinte-accent-ink: #f3f5f4;
 
-  --vinte-gold: #d4a857;
-  --vinte-gold-ink: #8f6a1f;
-  --vinte-success: #2e8b57;
-  --vinte-success-ink: #237049;
-  --vinte-success-surface: #eaf5ee;
-  --vinte-danger: #b3261e;
-  --vinte-danger-ink: #9b211a;
-  --vinte-danger-surface: #fdf0ef;
-  --vinte-warn-surface: #fbf3e2;
-  --vinte-warn-ink: #7d5c15;
-  --vinte-info-surface: #eef3f9;
-  --vinte-info-ink: #24507f;
+  --vinte-cta: #3ccf9e;
+  --vinte-cta-hover: #34bc8f;
+  --vinte-cta-ink: #082623;
 
-  /* Logo: o traço esquerdo do "V" clareia no tema escuro, como na arte original */
-  --vinte-logo-primary: #1e3a5f;
-  --vinte-logo-gold: #d4a857;
-  --vinte-logo-green: #2e8b57;
+  --vinte-mint: #3ccf9e;
+  --vinte-coral: #e8664f;
+  /* "Atenção" (meta perto do limite): coral suave; estourou = coral cheio */
+  --vinte-gold: #f2a393;
+  --vinte-gold-ink: #a3402b;
+  --vinte-success: #3ccf9e;
+  --vinte-success-ink: #0f7a57;
+  --vinte-success-surface: #e2f7ef;
+  --vinte-danger: #e8664f;
+  --vinte-danger-ink: #b9422c;
+  --vinte-danger-surface: #fcebe7;
+  --vinte-warn-surface: #fdf1ec;
+  --vinte-warn-ink: #a3402b;
+  --vinte-info-surface: #e9eeec;
+  --vinte-info-ink: #0d3b36;
 
-  /* Séries validadas contra o fundo #f8f6f2 (ver README) */
-  --vinte-series-1: #1f63a8;
-  --vinte-series-2: #b0842e;
-  --vinte-grid: #e4dfd5;
+  --vinte-logo-long: #0d3b36;
+  --vinte-logo-short: #3ccf9e;
+
+  /* Entradas × saídas: Menta × Coral (manual). Série única: Verde Profundo. */
+  --vinte-series-1: #3ccf9e;
+  --vinte-series-2: #e8664f;
+  --vinte-series-single: #0d3b36;
+  --vinte-grid: #d5ddda;
 }
 
-/* Tema escuro — degraus próprios, não uma inversão automática do claro */
+/* Tema escuro: Noite de fundo, Verde Profundo nas superfícies, Menta de acento */
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --vinte-page: #14273f;
-  --vinte-surface: #1e3a5f;
-  --vinte-surface-2: #26456e;
-  --vinte-line: #2e5480;
+  --vinte-page: #082623;
+  --vinte-surface: #0d3b36;
+  --vinte-surface-2: #134640;
+  --vinte-line: #1f524b;
 
-  --vinte-ink: #f8f6f2;
-  --vinte-ink-2: #c3cedc;
-  --vinte-ink-3: #9fb0c4;
+  --vinte-ink: #f3f5f4;
+  --vinte-ink-2: #a9bcb7;
+  --vinte-ink-3: #9db3ad;
 
-  --vinte-accent: #d4a857;
-  --vinte-accent-hover: #c2963f;
-  --vinte-accent-ink: #14273f;
+  --vinte-accent: #3ccf9e;
+  --vinte-accent-hover: #5cdcb0;
+  --vinte-accent-ink: #082623;
 
-  --vinte-gold: #d4a857;
-  --vinte-gold-ink: #e0bb79;
-  --vinte-success: #4caf7a;
-  --vinte-success-ink: #6ec698;
-  --vinte-success-surface: #1c3c30;
-  --vinte-danger: #e8635a;
-  --vinte-danger-ink: #f2938c;
-  --vinte-danger-surface: #3a2320;
-  --vinte-warn-surface: #3a3020;
-  --vinte-warn-ink: #e3bd72;
-  --vinte-info-surface: #1c3f66;
-  --vinte-info-ink: #a8c8e8;
+  --vinte-cta: #3ccf9e;
+  --vinte-cta-hover: #5cdcb0;
+  --vinte-cta-ink: #082623;
 
-  --vinte-logo-primary: #45678f;
-  --vinte-logo-gold: #d4a857;
-  --vinte-logo-green: #34a165;
+  --vinte-mint: #3ccf9e;
+  --vinte-coral: #e8664f;
+  --vinte-gold: #f2a393;
+  --vinte-gold-ink: #f2a393;
+  --vinte-success: #3ccf9e;
+  --vinte-success-ink: #3ccf9e;
+  --vinte-success-surface: #124a3e;
+  --vinte-danger: #e8664f;
+  --vinte-danger-ink: #f08a77;
+  --vinte-danger-surface: #3b2a24;
+  --vinte-warn-surface: #3b2a24;
+  --vinte-warn-ink: #f2a393;
+  --vinte-info-surface: #134640;
+  --vinte-info-ink: #f3f5f4;
 
-  /* Séries validadas contra o fundo #1e3a5f (ver README) */
-  --vinte-series-1: #5195d0;
-  --vinte-series-2: #b98c3d;
-  --vinte-grid: #2e5480;
+  --vinte-logo-long: #f3f5f4;
+  --vinte-logo-short: #3ccf9e;
+
+  --vinte-series-1: #3ccf9e;
+  --vinte-series-2: #e8664f;
+  --vinte-series-single: #3ccf9e;
+  --vinte-grid: #1f524b;
 }
 
 @layer base {
@@ -149,26 +184,60 @@
     font-family: inherit;
   }
 
-  ::selection {
-    background: var(--vinte-gold);
-    color: #14273f;
+  input,
+  textarea {
+    caret-color: var(--vinte-accent);
   }
+
+  ::selection {
+    background: var(--vinte-mint);
+    color: #082623;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vinte-line) transparent;
+  }
+
+  /* Anel de foco da marca em tudo que recebe foco pelo teclado. Só aparece
+     com teclado (:focus-visible), não ao clicar com o mouse. */
+  :focus-visible {
+    outline: 2px solid var(--vinte-accent);
+    outline-offset: 2px;
+  }
+
+  /* Campos nativos (checkbox, radio, range, progress) na cor da marca */
+  input,
+  progress {
+    accent-color: var(--vinte-accent);
+  }
+
+  kbd {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Valores (dinheiro, datas, contagens em tabela): sempre IBM Plex Mono */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-line bg-surface shadow-sm;
+    @apply rounded-2xl border border-line bg-surface;
   }
 
   .field {
-    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink
+    @apply w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink
            outline-none transition placeholder:text-ink-3
-           focus:border-accent focus:ring-2 focus:ring-accent/25
+           focus:border-accent focus:ring-2 focus:ring-accent/20
            disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3;
   }
 
   .label {
-    @apply mb-1.5 block text-sm font-medium text-ink-2;
+    @apply mb-1.5 block text-sm font-semibold text-ink-2;
   }
 
   /* Tailwind v4 não resolve `@apply btn` a partir de outra classe custom, então
@@ -177,19 +246,267 @@
   .btn-primary,
   .btn-secondary,
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
-           transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold
+           transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply bg-accent text-accent-ink hover:bg-accent-hover;
+    @apply bg-cta text-cta-ink hover:bg-cta-hover;
   }
 
   .btn-secondary {
-    @apply border border-line bg-surface text-ink-2 hover:bg-surface-2 hover:text-ink;
+    @apply border border-line bg-surface text-ink hover:bg-surface-2;
   }
 
   .btn-danger {
-    @apply border border-danger/30 bg-danger-surface text-danger-ink hover:border-danger/50;
+    @apply border border-danger/40 bg-danger-surface text-danger-ink hover:border-danger;
+  }
+
+  /*
+   * Páginas estáticas: no desktop (lg+) a página ocupa exatamente a área
+   * visível e nunca rola. Quem rola, quando precisa, é a lista dentro dela
+   * (no máximo 10 registros por página). No celular volta ao fluxo normal,
+   * porque não há como caber tudo numa tela estreita.
+   *
+   *   .page       raiz de cada página (coluna que preenche a altura)
+   *   .page-fill  bloco que ocupa o espaço que sobra
+   *   .page-grid  grade que ocupa o espaço que sobra (linhas de altura igual)
+   *   .scroll-y   lista que rola por dentro quando não cabe
+   *   .chart-box  área de gráfico: altura fixa no celular, elástica no desktop
+   *   .panel      card em coluna que pode encolher (título + conteúdo elástico)
+   */
+  .page {
+    @apply flex flex-col gap-4 lg:h-full lg:min-h-0;
+  }
+
+  .page-fill {
+    @apply flex flex-col gap-4 lg:min-h-0 lg:flex-1;
+  }
+
+  .page-grid {
+    @apply grid gap-4 lg:min-h-0 lg:flex-1;
+  }
+
+  .scroll-y {
+    @apply overflow-y-auto overscroll-contain lg:min-h-0;
+  }
+
+  .chart-box {
+    @apply h-64 min-w-0 lg:h-auto lg:min-h-0 lg:flex-1;
+  }
+
+  .panel {
+    @apply flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 lg:min-h-0;
+  }
+}
+
+/*
+ * Movimento do VINTE: rápido e com função (é um app de uso diário).
+ *   - entrada de página/painel: esmaece e sobe 6px, desacelerando;
+ *   - abas: o conteúdo entra do lado da aba escolhida (noção de lugar);
+ *   - aviso de "Desfazer": sobe da borda de baixo;
+ *   - logo: "o gesto de verificar" do manual, ao abrir e ao sincronizar.
+ * Com "reduzir movimento" ligado no sistema, sobra só o esmaecimento.
+ */
+@layer utilities {
+  .animate-enter {
+    animation: vinte-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .animate-from-right {
+    animation: vinte-from-right 220ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .animate-from-left {
+    animation: vinte-from-left 220ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .animate-toast {
+    animation: vinte-toast 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .animate-drawer {
+    animation: vinte-drawer 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .animate-fade {
+    animation: vinte-fade 200ms ease-out backwards;
+  }
+
+  /*
+   * O gesto de verificar (Manual, seção 07), curva ease-in-out (0.65, 0, 0.35, 1):
+   *   0,3–0,7 s  haste Menta é traçada
+   *   0,7–1,3 s  haste longa completa o check
+   *   1,2–1,8 s  "inte" desliza e aparece
+   * Cada haste usa pathLength=1, então o traço vai de 0 a 1 em qualquer tamanho.
+   */
+  .logo-intro .check-short,
+  .logo-intro .check-long {
+    stroke-dasharray: 1 2;
+    stroke-dashoffset: 1;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+    animation-fill-mode: forwards;
+  }
+
+  .logo-intro .check-short {
+    animation-name: vinte-stroke;
+    animation-duration: 400ms;
+    animation-delay: 300ms;
+  }
+
+  .logo-intro .check-long {
+    animation-name: vinte-stroke;
+    animation-duration: 600ms;
+    animation-delay: 700ms;
+  }
+
+  .logo-intro .logo-word {
+    opacity: 0;
+    animation: vinte-word 600ms cubic-bezier(0.65, 0, 0.35, 1) 1200ms forwards;
+  }
+
+  /* Sincronizando: o mesmo gesto em loop, com uma pausa no check completo */
+  .logo-loop .check-short,
+  .logo-loop .check-long {
+    stroke-dasharray: 1 2;
+    animation-duration: 1.6s;
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+    animation-iteration-count: infinite;
+  }
+
+  .logo-loop .check-short {
+    animation-name: vinte-loop-short;
+  }
+
+  .logo-loop .check-long {
+    animation-name: vinte-loop-long;
+  }
+}
+
+@keyframes vinte-stroke {
+  0% {
+    opacity: 1;
+    stroke-dashoffset: 1;
+  }
+  100% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes vinte-word {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vinte-loop-short {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 1;
+  }
+  1% {
+    opacity: 1;
+  }
+  25%,
+  85% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes vinte-loop-long {
+  0%,
+  25% {
+    opacity: 0;
+    stroke-dashoffset: 1;
+  }
+  26% {
+    opacity: 1;
+  }
+  60%,
+  85% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes vinte-drawer {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes vinte-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes vinte-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+@keyframes vinte-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+
+@keyframes vinte-toast {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+@keyframes vinte-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter,
+  .animate-from-right,
+  .animate-from-left,
+  .animate-toast,
+  .animate-drawer {
+    animation-name: vinte-fade;
+    animation-duration: 150ms;
+  }
+
+  /* Sem traçado: o logo só esmaece para dentro, já completo */
+  .logo-intro .check-short,
+  .logo-intro .check-long,
+  .logo-intro .logo-word {
+    stroke-dashoffset: 0;
+    opacity: 1;
+    animation: vinte-fade 400ms ease-out backwards;
+  }
+
+  .logo-loop .check-short,
+  .logo-loop .check-long {
+    stroke-dashoffset: 0;
+    animation: vinte-fade 1.2s ease-in-out infinite alternate;
   }
 }
