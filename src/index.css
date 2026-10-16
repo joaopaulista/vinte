@@ -302,7 +302,9 @@
 
 /*
  * Movimento do VINTE: rápido e com função (é um app de uso diário).
- *   - entrada de página/painel: esmaece e sobe 6px, desacelerando;
+ *   - troca de página: "renascer" — a página nova cresce para o tamanho real
+ *     e os blocos sobem em sequência, de cima para baixo;
+ *   - painel: esmaece e sobe 6px, desacelerando;
  *   - abas: o conteúdo entra do lado da aba escolhida (noção de lugar);
  *   - aviso de "Desfazer": sobe da borda de baixo;
  *   - logo: "o gesto de verificar" do manual, ao abrir e ao sincronizar.
@@ -311,6 +313,37 @@
 @layer utilities {
   .animate-enter {
     animation: vinte-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  /*
+   * Desempenho: aqui só se anima `transform` e `opacity`, que a GPU compõe sem
+   * redesenhar nada. Desfoque (`filter`), sombra ou altura animados obrigam o
+   * navegador a repintar gráficos e tabelas inteiros a cada quadro — é isso
+   * que trava em máquina fraca. A página toda fica pronta em ~0,6 s.
+   */
+
+  /* A página inteira: sai de 98,5% para o tamanho real */
+  .animate-reborn {
+    transform-origin: 50% 0;
+    animation: vinte-reborn 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  /* Cada bloco da página (cabeçalho, KPIs, grade…) sobe e aparece, em cascata */
+  .animate-reborn > .page > * {
+    animation: vinte-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .animate-reborn > .page > :nth-child(2) {
+    animation-delay: 45ms;
+  }
+  .animate-reborn > .page > :nth-child(3) {
+    animation-delay: 90ms;
+  }
+  .animate-reborn > .page > :nth-child(4) {
+    animation-delay: 135ms;
+  }
+  .animate-reborn > .page > :nth-child(n + 5) {
+    animation-delay: 180ms;
   }
 
   .animate-from-right {
@@ -451,6 +484,19 @@
   }
 }
 
+@keyframes vinte-reborn {
+  from {
+    transform: scale(0.985);
+  }
+}
+
+@keyframes vinte-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
 @keyframes vinte-enter {
   from {
     opacity: 0;
@@ -487,6 +533,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-enter,
+  .animate-reborn,
+  .animate-reborn > .page > *,
   .animate-from-right,
   .animate-from-left,
   .animate-toast,

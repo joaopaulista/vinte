@@ -91,8 +91,8 @@ export function Logo({
 }: LogoProps) {
   const lockup = (
     <svg
-      viewBox="12 12 226 74"
-      className={[size ?? (variant === 'compact' ? 'h-7 w-auto' : 'h-14 w-auto'), MOTION_CLASS[motion]]
+      viewBox="8 4 236 82"
+      className={[size ?? (variant === 'compact' ? 'h-[31px] w-auto' : 'h-[62px] w-auto'), MOTION_CLASS[motion]]
         .filter(Boolean)
         .join(' ')}
       style={tone === 'negative' ? NEGATIVE : undefined}
@@ -100,10 +100,14 @@ export function Logo({
       aria-label="VINTE"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <CheckStrokes />
+      {/* No lockup o V cresce 15% a partir da ponta de baixo, para pesar como uma
+          maiúscula ao lado de "inte"; o texto anda 6 unidades para dar espaço. */}
+      <g transform="translate(42 76) scale(1.15) translate(-42 -76)">
+        <CheckStrokes />
+      </g>
       <text
         className="logo-word"
-        x="90"
+        x="96"
         y="53"
         dominantBaseline="middle"
         fontFamily="var(--font-display)"

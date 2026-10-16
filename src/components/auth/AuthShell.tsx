@@ -24,7 +24,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
 
       <div className="mx-auto grid w-full max-w-6xl content-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-16 lg:px-12">
         <section className="flex flex-col lg:justify-center">
-          <Logo tone="negative" motion="intro" size="h-9 w-auto lg:h-12" />
+          <Logo tone="negative" motion="intro" size="h-10 w-auto lg:h-[53px]" />
 
           <h2 className="mt-8 max-w-md font-display text-3xl leading-[1.1] font-bold tracking-[-0.03em] text-balance text-mist sm:text-4xl lg:mt-14 lg:text-5xl">
             Cada transação conferida antes de virar número.

@@ -149,7 +149,7 @@ export function AppLayout() {
 
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:h-dvh lg:overflow-y-auto lg:px-8 lg:py-6">
         {/* A chave pela rota faz a página nova entrar com a animação de entrada. */}
-        <div key={`${location.pathname}#${syncVersion}`} className="animate-enter lg:h-full">
+        <div key={`${location.pathname}#${syncVersion}`} className="animate-reborn lg:h-full">
           <Outlet />
         </div>
       </main>
