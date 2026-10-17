@@ -1,7 +1,7 @@
 {
   "name": "vinte",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "VINTE — painel financeiro pessoal com Open Finance, conciliacao bancaria e dashboards",
   "scripts": {

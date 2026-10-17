@@ -136,3 +136,52 @@ function normalizeTransaction(row: Record<string, unknown>): TransactionWithRela
     subcategory: firstOrNull(subcategory),
   };
 }
+
+/** Transações da conta no intervalo, em qualquer status: base da regra de duplicidade. */
+export async function fetchAccountEntries(
+  accountId: string,
+  from: string,
+  to: string,
+): Promise<{ transaction_date: string; amount: number; description: string | null }[]> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('transaction_date, amount, description')
+    .eq('account_id', accountId)
+    .gte('transaction_date', from)
+    .lte('transaction_date', to);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ ...row, amount: Number(row.amount) }));
+}
+
+export interface ImportedLine {
+  date: string;
+  description: string;
+  amount: number;
+}
+
+/**
+ * Grava as linhas do extrato como pendentes. As regras de categoria e a
+ * marcação de pagamento de fatura rodam nos triggers do banco, como no sync.
+ */
+export async function importStatementLines(
+  userId: string,
+  accountId: string,
+  lines: ImportedLine[],
+): Promise<number> {
+  if (lines.length === 0) return 0;
+  const { error } = await supabase.from('transactions').insert(
+    lines.map((line) => ({
+      user_id: userId,
+      account_id: accountId,
+      description: line.description,
+      amount: line.amount,
+      transaction_date: line.date,
+      type: line.amount < 0 ? 'DEBIT' : 'CREDIT',
+      reconciliation_status: 'pending',
+    })),
+  );
+
+  if (error) throw error;
+  return lines.length;
+}

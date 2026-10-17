@@ -17,8 +17,13 @@ export interface PaginationState<T> {
  * e a página atual deixa de existir, cai para a última página válida em vez
  * de mostrar uma página vazia.
  */
-export function usePagination<T>(items: T[], requestedPageSize = MAX_PAGE_SIZE): PaginationState<T> {
-  const pageSize = Math.min(requestedPageSize, MAX_PAGE_SIZE);
+export function usePagination<T>(
+  items: T[],
+  requestedPageSize = MAX_PAGE_SIZE,
+  /** Listas curtas de cadastro (categorias) podem passar do teto de 10. */
+  { allowAboveMax = false }: { allowAboveMax?: boolean } = {},
+): PaginationState<T> {
+  const pageSize = allowAboveMax ? requestedPageSize : Math.min(requestedPageSize, MAX_PAGE_SIZE);
   const [page, setPage] = useState(1);
 
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));

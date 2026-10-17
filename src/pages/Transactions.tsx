@@ -11,8 +11,8 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { usePendingCount } from '@/contexts/PendingCountContext';
 import { reopenTransaction } from '@/services/transactionsService';
-import { formatCurrency } from '@/utils/format';
-import type { TransactionFilters as Filters } from '@/types';
+import { formatCurrency, formatDate } from '@/utils/format';
+import type { TransactionFilters as Filters, TransactionWithRelations } from '@/types';
 
 const EMPTY_FILTERS: Filters = {
   status: 'all',
@@ -24,7 +24,11 @@ const EMPTY_FILTERS: Filters = {
 
 export default function Transactions() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const { transactions, loading, error, reload } = useTransactions(filters);
+  // A busca é feita aqui, não no banco: precisa olhar campos que vêm de
+  // outras tabelas (conta, categoria) e valores formatados ("231,45").
+  const { search, ...serverFilters } = filters;
+  const { transactions: fetched, loading, error, reload } = useTransactions(serverFilters);
+  const transactions = useMemo(() => searchTransactions(fetched, search), [fetched, search]);
   const { tree } = useCategories();
   const { refreshPendingCount } = usePendingCount();
   const [reopeningId, setReopeningId] = useState<string | null>(null);
@@ -125,4 +129,41 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
       <dd className={`text-lg font-semibold num ${tone}`}>{formatCurrency(value)}</dd>
     </div>
   );
+}
+
+const STATUS_LABELS = { pending: 'pendente', approved: 'aprovada', rejected: 'reprovada' } as const;
+
+/** Minúsculas e sem acento: "transferencia" acha "Transferência". */
+function normalize(value: string): string {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+/**
+ * Cada palavra da busca precisa aparecer em algum campo da transação:
+ * "edp 231" acha a conta de luz de R$ 231,45; "mercado aprovada" acha as
+ * compras de mercado já aprovadas.
+ */
+function searchTransactions(transactions: TransactionWithRelations[], search: string) {
+  const terms = normalize(search).split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return transactions;
+  return transactions.filter((transaction) => {
+    const haystack = normalize(
+      [
+        transaction.description ?? '',
+        transaction.notes ?? '',
+        transaction.account?.name ?? '',
+        transaction.category?.name ?? '',
+        transaction.subcategory?.name ?? '',
+        STATUS_LABELS[transaction.reconciliation_status],
+        transaction.amount < 0 ? 'saida despesa' : 'entrada receita',
+        formatCurrency(transaction.amount),
+        String(Math.abs(transaction.amount)).replace('.', ','),
+        String(Math.abs(transaction.amount)),
+        formatDate(transaction.transaction_date),
+        transaction.transaction_date,
+        transaction.total_installments ? `${transaction.installment_number}/${transaction.total_installments}` : '',
+      ].join(' '),
+    );
+    return terms.every((term) => haystack.includes(term));
+  });
 }

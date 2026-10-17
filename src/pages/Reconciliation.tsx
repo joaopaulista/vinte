@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { CheckCheck, CheckCircle2, Loader2, Search, Sparkles, Undo2, X } from 'lucide-react';
 import { ReconciliationCard, initialSelection } from '@/components/reconciliation/ReconciliationCard';
 import { QueueRow } from '@/components/reconciliation/QueueRow';
+import { ImportStatementCard } from '@/components/reconciliation/ImportStatementCard';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -55,6 +56,7 @@ export default function Reconciliation() {
   const [undoing, setUndoing] = useState(false);
   const [bulkStep, setBulkStep] = useState<'idle' | 'confirm' | 'running'>('idle');
   const activeRef = useRef<HTMLDivElement>(null);
+  const loadedOnce = useRef(false);
 
   const queue = useMemo(
     () => transactions.filter((transaction) => !resolvedIds.has(transaction.id)),
@@ -299,7 +301,12 @@ export default function Reconciliation() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (loading || loadingCategories || loadingHistory) return <Spinner label="Carregando pendências…" />;
+  // Depois da primeira carga, recarregar a fila (após importar um extrato) não
+  // troca a página pelo spinner: a lista só se atualiza no lugar.
+  if ((loading && !loadedOnce.current) || loadingCategories || loadingHistory) {
+    return <Spinner label="Carregando pendências…" />;
+  }
+  loadedOnce.current = true;
 
   if (error) {
     return (
@@ -307,10 +314,19 @@ export default function Reconciliation() {
     );
   }
 
-  const done = transactions.length - queue.length;
+  // Conta pelo que foi resolvido aqui, não pela diferença das listas: depois de
+  // importar um extrato a fila é recarregada e as conciliadas somem dela.
+  const done = resolvedIds.size;
+  const total = queue.length + done;
 
-  const progress = transactions.length > 0 && (
-    <section className="card shrink-0 p-4" aria-label="Andamento da conciliação">
+  async function afterImport(message: string) {
+    setNotice(message);
+    await reload();
+    void refreshPendingCount();
+  }
+
+  const progress = (
+    <section className="card flex min-w-0 flex-col p-4" aria-label="Andamento da conciliação">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
         <span className="font-medium text-ink">
           {queue.length} {queue.length === 1 ? 'pendente' : 'pendentes'}
@@ -322,7 +338,7 @@ export default function Reconciliation() {
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
         <div
           className="h-full rounded-full bg-success transition-all"
-          style={{ width: `${(done / transactions.length) * 100}%` }}
+          style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
         />
       </div>
 
@@ -392,28 +408,29 @@ export default function Reconciliation() {
         description="Aprovar faz a transação contar nos seus números; reprovar deixa de fora. Dá para desfazer as duas logo depois."
       />
 
-      {queue.length === 0 ? (
-        <>
-          {progress}
-          <div className="card page-fill justify-center">
-            <EmptyState
-              icon={CheckCircle2}
-              tone={done > 0 ? 'success' : 'neutral'}
-              title={done > 0 ? 'Tudo conciliado!' : 'Nada pendente por aqui'}
-              description={
-                done > 0
-                  ? `Você conciliou ${done} ${done === 1 ? 'transação' : 'transações'}. Os números da Home já estão atualizados.`
-                  : 'Assim que novas transações forem sincronizadas, elas aparecem nesta tela.'
-              }
-            />
-          </div>
-        </>
-      ) : (
-        // Desktop: a transação em destaque à esquerda, a fila à direita.
-        <div className="page-grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-rows-1">
-          <div className="scroll-y -m-1 flex min-w-0 flex-col gap-4 p-1">
-            {progress}
+      {/* Duas colunas iguais, nas duas faixas: andamento e importação em cima,
+          transação atual e fila embaixo. */}
+      <div className="grid shrink-0 gap-4 lg:grid-cols-2">
+        {progress}
+        <ImportStatementCard onImported={afterImport} />
+      </div>
 
+      {queue.length === 0 ? (
+        <div className="card page-fill justify-center">
+          <EmptyState
+            icon={CheckCircle2}
+            tone={done > 0 ? 'success' : 'neutral'}
+            title={done > 0 ? 'Tudo conciliado!' : 'Nada pendente por aqui'}
+            description={
+              done > 0
+                ? `Você conciliou ${done} ${done === 1 ? 'transação' : 'transações'}. Os números da Home já estão atualizados.`
+                : 'Assim que novas transações forem sincronizadas ou um extrato for importado, elas aparecem nesta tela.'
+            }
+          />
+        </div>
+      ) : (
+        <div className="page-grid lg:grid-cols-2 lg:grid-rows-1">
+          <div className="scroll-y -m-1 flex min-w-0 flex-col gap-4 p-1">
             {active ? (
               <div ref={activeRef} className="scroll-mt-1 space-y-2">
                 <ReconciliationCard

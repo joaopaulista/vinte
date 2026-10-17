@@ -14,6 +14,8 @@ import {
 } from '@/services/categoriesService';
 import type { Category, CategoryTree } from '@/types';
 
+const CATEGORIES_PER_PAGE = 15;
+
 export function describeError(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
   if (message.includes('duplicate')) return 'Já existe um registro com esse nome.';
@@ -36,7 +38,8 @@ export function CategoryManager() {
   // Regra: precisa sobrar pelo menos 1 categoria (o banco também garante).
   const ownCategoryCount = tree.filter((category) => category.user_id !== null).length;
   const [deleting, setDeleting] = useState<Category | null>(null);
-  const pagination = usePagination(tree);
+  // Até 15 categorias à vista; da 16ª em diante vão para a página 2.
+  const pagination = usePagination(tree, CATEGORIES_PER_PAGE, { allowAboveMax: true });
 
   async function run(action: () => Promise<unknown>): Promise<boolean> {
     setBusy(true);

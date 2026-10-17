@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, Wallet } from 'lucide-react';
+import { Building2, CreditCard, Landmark, Wallet } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { ConnectBankButton } from '@/components/accounts/ConnectBankButton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
-import { Pagination } from '@/components/common/Pagination';
 import { PageHeader } from '@/components/common/PageHeader';
-import { usePagination } from '@/hooks/usePagination';
 import { fetchAccounts, fetchBankConnections } from '@/services/accountsService';
 import { usePendingCount } from '@/contexts/PendingCountContext';
 import { formatCurrency, formatDate } from '@/utils/format';
@@ -48,14 +48,21 @@ export default function Accounts() {
     [load, refreshPendingCount],
   );
 
-  const pagination = usePagination(accounts, 9);
-  const totalBalance = accounts.reduce((sum, account) => sum + (account.balance ?? 0), 0);
+  const debitAccounts = accounts.filter((account) => !isCreditAccount(account));
+  const creditAccounts = accounts.filter(isCreditAccount);
+  // No cartão, o saldo do Pluggy é o que está em aberto: a soma das faturas.
+  const totalToPay = creditAccounts.reduce((sum, account) => sum + Math.abs(account.balance ?? 0), 0);
 
   return (
     <div className="page">
       <PageHeader
         title="Contas"
-        description="Bancos conectados via Open Finance e respectivas contas."
+        description={
+          <>
+            Bancos conectados via Open Finance, separados entre débito e crédito.
+            {lastSyncLabel(connections)} Para atualizar, clique no logo do VINTE no menu.
+          </>
+        }
         actions={<ConnectBankButton onConnected={afterSync} />}
       />
 
@@ -80,47 +87,108 @@ export default function Accounts() {
           />
         </div>
       ) : (
-        <>
-          <div className="card flex shrink-0 flex-wrap items-center justify-between gap-4 p-4">
-            <div>
-              <p className="text-sm text-ink-2">Saldo consolidado</p>
-              <p className="mt-1 num text-2xl font-semibold text-ink">
-                {formatCurrency(totalBalance)}
-              </p>
-              <p className="mt-1 text-xs text-ink-3">
-                {accounts.length} {accounts.length === 1 ? 'conta' : 'contas'} em{' '}
-                {connections.length} {connections.length === 1 ? 'conexão' : 'conexões'}
-                {lastSyncLabel(connections)}
-              </p>
-              <p className="mt-1 text-xs text-ink-3">Para atualizar, clique no logo do VINTE no menu.</p>
-            </div>
-          </div>
-
-          <div className="scroll-y -m-1 grid content-start gap-4 p-1 md:grid-cols-2 xl:grid-cols-3">
-            {pagination.pageItems.map((account) => (
-              <div key={account.id} className="card p-4">
-                <div className="flex items-center gap-2 text-sm text-ink-2">
-                  <Building2 className="h-4 w-4" aria-hidden />
-                  <span className="truncate">
-                    {account.bank_connection?.institution_name ?? 'Instituição desconhecida'}
-                  </span>
+        // Débito e crédito lado a lado: saldo de conta e fatura de cartão não se somam.
+        <div className="page-grid lg:grid-cols-2 lg:grid-rows-1">
+          <AccountSection
+            icon={Landmark}
+            title="Débito"
+            hint="Contas corrente e poupança: o saldo é o que você tem."
+            accounts={debitAccounts}
+            empty="Nenhuma conta de débito conectada."
+          />
+          <AccountSection
+            icon={CreditCard}
+            title="Crédito"
+            hint="Cartões: o valor é o que você tem a pagar."
+            accounts={creditAccounts}
+            empty="Nenhum cartão de crédito conectado."
+            summary={
+              creditAccounts.length > 0 && (
+                <div className="text-right">
+                  <p className="text-xs text-ink-2">Total a pagar</p>
+                  <p className="num text-lg font-semibold text-danger-ink">{formatCurrency(totalToPay)}</p>
                 </div>
-                <p className="mt-2 font-medium text-ink">{account.name ?? 'Conta'}</p>
-                <p className="text-xs text-ink-3">{account.type ?? '—'}</p>
-                <p className="mt-3 num text-xl font-semibold text-ink">
-                  {formatCurrency(account.balance)}
-                </p>
-                <p className="mt-1 text-xs text-ink-3">
-                  Atualizada em {formatDate(account.updated_at.slice(0, 10))}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <Pagination state={pagination} noun="contas" />
-        </>
+              )
+            }
+            credit
+          />
+        </div>
       )}
     </div>
+  );
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  CHECKING_ACCOUNT: 'Conta corrente',
+  SAVINGS_ACCOUNT: 'Poupança',
+  CREDIT_CARD: 'Cartão de crédito',
+  BANK: 'Conta bancária',
+  CREDIT: 'Crédito',
+};
+
+function isCreditAccount(account: AccountWithConnection): boolean {
+  const type = (account.type ?? '').toUpperCase();
+  return type === 'CREDIT_CARD' || type === 'CREDIT';
+}
+
+function AccountSection({
+  icon: Icon,
+  title,
+  hint,
+  accounts,
+  empty,
+  summary,
+  credit = false,
+}: {
+  icon: LucideIcon;
+  title: string;
+  hint: string;
+  accounts: AccountWithConnection[];
+  empty: string;
+  summary?: ReactNode;
+  credit?: boolean;
+}) {
+  return (
+    <section className="panel gap-3" aria-labelledby={`accounts-${title}`}>
+      <div className="flex shrink-0 items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-ink-2">
+            <Icon className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 id={`accounts-${title}`} className="text-sm font-semibold text-ink">
+              {title} <span className="font-normal text-ink-3">({accounts.length})</span>
+            </h2>
+            <p className="text-xs text-ink-2">{hint}</p>
+          </div>
+        </div>
+        {summary}
+      </div>
+
+      {accounts.length === 0 ? (
+        <p className="py-8 text-center text-sm text-ink-3">{empty}</p>
+      ) : (
+        <ul className="scroll-y -m-1 grid content-start gap-3 p-1 sm:grid-cols-2">
+          {accounts.map((account) => (
+            <li key={account.id} className="rounded-xl border border-line p-4">
+              <div className="flex items-center gap-2 text-sm text-ink-2">
+                <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="truncate">{account.bank_connection?.institution_name ?? 'Instituição desconhecida'}</span>
+              </div>
+              <p className="mt-2 truncate font-medium text-ink">{account.name ?? 'Conta'}</p>
+              <p className="text-xs text-ink-3">
+                {TYPE_LABELS[(account.type ?? '').toUpperCase()] ?? account.type ?? '—'}
+              </p>
+              <p className="mt-3 text-xs text-ink-2">{credit ? 'A pagar' : 'Saldo'}</p>
+              <p className={`num text-xl font-semibold ${credit ? 'text-danger-ink' : 'text-ink'}`}>
+                {formatCurrency(credit ? Math.abs(account.balance ?? 0) : account.balance)}
+              </p>
+              <p className="mt-1 text-xs text-ink-3">Atualizada em {formatDate(account.updated_at.slice(0, 10))}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -140,5 +208,5 @@ function lastSyncLabel(connections: BankConnection[]): string {
   if (timestamps.length === 0) return '';
 
   const mostRecent = timestamps.sort().at(-1) as string;
-  return ` · última sincronização em ${new Date(mostRecent).toLocaleString('pt-BR')}`;
+  return ` Última sincronização em ${new Date(mostRecent).toLocaleString('pt-BR')}.`;
 }

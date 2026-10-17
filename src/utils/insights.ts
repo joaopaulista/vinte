@@ -101,17 +101,19 @@ export interface RankedItem {
 /**
  * Soma despesas agrupando pela chave pedida e devolve do maior para o menor.
  * O que passar de `limit` vira uma linha "Outros", nunca mais uma barra.
+ * Com `side: 'income'`, soma as entradas em vez das saídas.
  */
 function rankExpenses(
   transactions: TransactionWithRelations[],
   keyOf: (transaction: TransactionWithRelations) => { id: string | null; name: string },
   limit: number,
+  side: 'expense' | 'income' = 'expense',
 ): RankedItem[] {
   const totals = new Map<string, RankedItem>();
   let grandTotal = 0;
 
   for (const transaction of transactions) {
-    if (transaction.amount >= 0) continue;
+    if (side === 'expense' ? transaction.amount >= 0 : transaction.amount <= 0) continue;
     const value = Math.abs(transaction.amount);
     const { id, name } = keyOf(transaction);
     const mapKey = id ?? `name:${name}`;
@@ -152,6 +154,18 @@ export function expensesByCategory(transactions: TransactionWithRelations[], lim
       name: transaction.category?.name ?? 'Sem categoria',
     }),
     limit,
+  );
+}
+
+export function incomeByCategory(transactions: TransactionWithRelations[], limit = 10) {
+  return rankExpenses(
+    transactions,
+    (transaction) => ({
+      id: transaction.category?.id ?? null,
+      name: transaction.category?.name ?? 'Sem categoria',
+    }),
+    limit,
+    'income',
   );
 }
 

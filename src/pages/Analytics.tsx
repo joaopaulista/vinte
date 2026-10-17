@@ -20,8 +20,6 @@ import {
   ChevronLeft,
   Minus,
   Percent,
-  SlidersHorizontal,
-  X,
   Scale,
   TrendingDown,
   TrendingUp,
@@ -39,6 +37,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { usePagination } from '@/hooks/usePagination';
 import { Pagination } from '@/components/common/Pagination';
 import { PageHeader } from '@/components/common/PageHeader';
+import { FiltersPopover } from '@/components/common/FiltersPopover';
 import { formatCurrency, formatCurrencyCompact, formatMonthLabel, monthsAgo, toDateInputValue } from '@/utils/format';
 import { currentMonthKey, lastMonthKeys } from '@/utils/analytics';
 import {
@@ -46,6 +45,7 @@ import {
   expensesByCategory,
   expensesByMerchant,
   expensesBySubcategory,
+  incomeByCategory,
   inMonths,
   isTransfer,
   metricValue,
@@ -233,6 +233,8 @@ export default function Analytics() {
       previous: summarize(previousScope),
       monthly: monthlyMetric(inMonths(byCategory, chartKeys), chartKeys, metric),
       ranking: categoryId ? expensesBySubcategory(scope) : expensesByCategory(inMonths(base, scopeKeys)),
+      // Receitas não seguem o filtro de categoria: as opções dele são de despesas.
+      incomeRanking: incomeByCategory(inMonths(base, scopeKeys)),
       merchants: expensesByMerchant(scope),
       rows: [...scope].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)),
       categoryName,
@@ -276,7 +278,7 @@ export default function Analytics() {
         actions={
           // A previsão do cartão não usa nenhum filtro.
           tab !== 'forecast' && (
-            <FiltersPopover open={filtersOpen} onOpenChange={setFiltersOpen} activeCount={activeFilters}>
+            <FiltersPopover id="filtros-analises" open={filtersOpen} onOpenChange={setFiltersOpen} activeCount={activeFilters}>
               {usesPeriod && (
                 <>
                   <label className="block">
@@ -488,42 +490,52 @@ export default function Analytics() {
                 </div>
               </section>
 
-              <section className="panel lg:col-span-2">
-                <div className="flex shrink-0 items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-ink">
-                    {view.categoryName ? `Subcategorias de ${view.categoryName}` : 'Despesas por categoria'}
-                  </h2>
-                  {categoryId && (
-                    <button
-                      type="button"
-                      className="btn-secondary min-h-8 px-2.5 py-1 text-xs"
-                      onClick={() => update({ categoria: null, subcategoria: null })}
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                      Todas
-                    </button>
-                  )}
-                </div>
-                <p className="shrink-0 text-xs text-ink-2">
-                  {categoryId
-                    ? subcategoryId
-                      ? 'Gasto na subcategoria escolhida.'
-                      : 'Clique numa subcategoria para filtrar a página.'
-                    : 'Clique numa categoria para abrir as subcategorias.'}
-                </p>
-                <div className="scroll-y">
-                  <RankingChart
-                    data={view.ranking}
-                    onSelect={
-                      subcategoryId
-                        ? undefined
-                        : (item) =>
-                            item.id !== null &&
-                            update(categoryId ? { subcategoria: item.id } : { categoria: item.id, subcategoria: null })
-                    }
-                  />
-                </div>
-              </section>
+              <div className="flex min-w-0 flex-col gap-4 lg:col-span-2 lg:min-h-0">
+                <section className="panel lg:flex-1">
+                  <h2 className="shrink-0 text-sm font-semibold text-ink">Receitas por categoria</h2>
+                  <p className="shrink-0 text-xs text-ink-2">De onde veio o dinheiro que entrou.</p>
+                  <div className="scroll-y">
+                    <RankingChart data={view.incomeRanking} side="income" />
+                  </div>
+                </section>
+
+                <section className="panel lg:flex-1">
+                  <div className="flex shrink-0 items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold text-ink">
+                      {view.categoryName ? `Subcategorias de ${view.categoryName}` : 'Despesas por categoria'}
+                    </h2>
+                    {categoryId && (
+                      <button
+                        type="button"
+                        className="btn-secondary min-h-8 px-2.5 py-1 text-xs"
+                        onClick={() => update({ categoria: null, subcategoria: null })}
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                        Todas
+                      </button>
+                    )}
+                  </div>
+                  <p className="shrink-0 text-xs text-ink-2">
+                    {categoryId
+                      ? subcategoryId
+                        ? 'Gasto na subcategoria escolhida.'
+                        : 'Clique numa subcategoria para filtrar a página.'
+                      : 'Clique numa categoria para abrir as subcategorias.'}
+                  </p>
+                  <div className="scroll-y">
+                    <RankingChart
+                      data={view.ranking}
+                      onSelect={
+                        subcategoryId
+                          ? undefined
+                          : (item) =>
+                              item.id !== null &&
+                              update(categoryId ? { subcategoria: item.id } : { categoria: item.id, subcategoria: null })
+                      }
+                    />
+                  </div>
+                </section>
+              </div>
             </div>
           </>
         )}
@@ -655,83 +667,6 @@ function RadioCards<T extends string>({
           {item.render(value === item.key)}
         </button>
       ))}
-    </div>
-  );
-}
-
-interface FiltersPopoverProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  activeCount: number;
-  children: ReactNode;
-}
-
-/**
- * Filtros recolhidos num botão no canto superior direito. Abrem num painel
- * suspenso, sem empurrar a página; fecham com Esc ou clicando fora.
- */
-function FiltersPopover({ open, onOpenChange, activeCount, children }: FiltersPopoverProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) onOpenChange(false);
-    }
-    function onKey(event: globalThis.KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      onOpenChange(false);
-      buttonRef.current?.focus();
-    }
-    document.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open, onOpenChange]);
-
-  return (
-    <div ref={containerRef} className="relative ml-auto">
-      <button
-        ref={buttonRef}
-        type="button"
-        className={`btn-secondary ${open ? 'border-accent text-ink' : ''}`}
-        onClick={() => onOpenChange(!open)}
-        aria-expanded={open}
-        aria-controls="filtros-analises"
-      >
-        <SlidersHorizontal className="h-4 w-4" aria-hidden />
-        Filtros
-        {activeCount > 0 && (
-          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs font-semibold text-accent-ink tabular-nums">
-            {activeCount}
-          </span>
-        )}
-      </button>
-      {open && (
-        <div
-          id="filtros-analises"
-          role="group"
-          aria-label="Filtros"
-          className="animate-fade absolute top-full right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-xl border border-line bg-surface p-4 shadow-2xl"
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-ink">Filtros</p>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="-m-1.5 grid h-7 w-7 place-items-center rounded-md text-ink-3 transition hover:bg-surface-2 hover:text-ink"
-              aria-label="Recolher filtros"
-              title="Recolher filtros"
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
-          </div>
-          {children}
-        </div>
-      )}
     </div>
   );
 }
@@ -1003,12 +938,16 @@ function MonthlyChart({
 function RankingChart({
   data,
   onSelect,
+  side = 'expense',
 }: {
   data: RankedItem[];
   onSelect?: (item: RankedItem) => void;
+  /** Receitas usam a cor de entrada (Menta); despesas, a série única. */
+  side?: 'expense' | 'income';
 }) {
+  const noun = side === 'income' ? 'receitas' : 'despesas';
   if (data.length === 0) {
-    return <p className="py-10 text-center text-sm text-ink-3">Sem despesas neste recorte.</p>;
+    return <p className="py-10 text-center text-sm text-ink-3">Sem {noun} neste recorte.</p>;
   }
 
   const height = Math.max(200, data.length * 34 + 24);
@@ -1032,7 +971,7 @@ function RankingChart({
                   style={{ width: `${Math.max(2, (item.total / max) * 100)}%` }}
                 />
               </span>
-              <span className="mt-0.5 block text-xs text-ink-2">{(item.share * 100).toFixed(1)}% das despesas</span>
+              <span className="mt-0.5 block text-xs text-ink-2">{(item.share * 100).toFixed(1)}% das {noun}</span>
             </>
           );
           const clickable = onSelect && item.id !== null;
@@ -1073,7 +1012,7 @@ function RankingChart({
                   <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
                     <p className="mb-1 font-semibold text-ink">{item.name}</p>
                     <p className="font-medium text-ink num">{formatCurrency(item.total)}</p>
-                    <p className="text-ink-3">{(item.share * 100).toFixed(1)}% das despesas</p>
+                    <p className="text-ink-3">{(item.share * 100).toFixed(1)}% das {noun}</p>
                     {onSelect && item.id && <p className="mt-1 text-ink-3">Clique para ver subcategorias</p>}
                   </div>
                 ) : null;
@@ -1081,7 +1020,7 @@ function RankingChart({
             />
             <Bar
               dataKey="total"
-              fill={CHART_COLORS.single}
+              fill={side === 'income' ? CHART_COLORS.income : CHART_COLORS.single}
               radius={[0, 4, 4, 0]}
               maxBarSize={20}
               isAnimationActive={false}
