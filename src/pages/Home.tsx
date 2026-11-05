@@ -195,16 +195,22 @@ export default function Home() {
             <time dateTime={toDateInputValue(new Date())} className="text-sm font-medium text-ink-2 first-letter:uppercase">
               {TODAY_LONG.format(new Date())}
             </time>
-            <OwnerFilter owners={owners} value={ownerFilter} onChange={setOwnerFilter} id="home-owner" />
-            {pendingCount > 0 && (
-              <Link
-                to="/conciliacao"
-                className="inline-flex items-center gap-2 rounded-lg border border-warn-ink/30 bg-warn-surface px-3 py-2 text-sm font-medium text-warn-ink transition hover:border-warn-ink/70"
-                title="Pendentes ainda não entram nos números desta página"
-              >
-                {pendingCount} {pendingCount === 1 ? 'pendente' : 'pendentes'} de conciliação
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
+            {/* Pendentes à esquerda do responsável, na mesma linha: o topo
+                não cresce quando há conciliação pendente. */}
+            {(pendingCount > 0 || owners.length > 0) && (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {pendingCount > 0 && (
+                  <Link
+                    to="/conciliacao"
+                    className="inline-flex items-center gap-2 rounded-xl border border-warn-ink/30 bg-warn-surface px-3 py-1.5 text-sm font-medium text-warn-ink transition hover:border-warn-ink/70"
+                    title="Pendentes ainda não entram nos números desta página"
+                  >
+                    {pendingCount} {pendingCount === 1 ? 'pendente' : 'pendentes'} de conciliação
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                )}
+                <OwnerFilter owners={owners} value={ownerFilter} onChange={setOwnerFilter} id="home-owner" />
+              </div>
             )}
           </div>
         }
