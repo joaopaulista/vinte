@@ -37,6 +37,7 @@ arquivos de `supabase/migrations/` **na ordem**:
 12. `0012_account_owners.sql` — responsáveis internos por conta (quem cuida de cada banco)
 13. `0013_manual_entries.sql` — lançamentos manuais (só em contas manuais)
 14. `0014_card_closing_day.sql` — fechamento e vencimento do cartão; compra depois do fechamento conta no mês seguinte
+15. `0015_bill_payment_pairs.sql` — reconhece o pagamento de fatura pelo par (mesmo valor no cartão e na conta) e permite marcar à mão
 
 ### 2. Configurar as variáveis
 

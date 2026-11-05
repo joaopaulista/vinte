@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Check, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Check, CreditCard, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { CategoryPicker } from '@/components/categories/CategoryPicker';
 import { DescriptionLabel } from '@/components/transactions/DescriptionLabel';
 import { formatCurrency, formatDate } from '@/utils/format';
@@ -45,6 +45,8 @@ interface ReconciliationCardProps {
   focusOnMount?: boolean;
   onApprove: (categoryId: string, subcategoryId: string | null, notes: string) => Promise<void>;
   onReject: (notes: string) => Promise<void>;
+  /** Pagamento de fatura: sai da fila junto com o outro lado do pagamento. */
+  onBillPayment: () => Promise<void>;
 }
 
 /**
@@ -59,13 +61,14 @@ export function ReconciliationCard({
   focusOnMount = false,
   onApprove,
   onReject,
+  onBillPayment,
 }: ReconciliationCardProps) {
   const initial = initialSelection(transaction, suggestion);
   const [categoryId, setCategoryId] = useState(initial.categoryId);
   const [subcategoryId, setSubcategoryId] = useState(initial.subcategoryId);
   const [notes, setNotes] = useState(transaction.notes ?? '');
   const [showNotes, setShowNotes] = useState(Boolean(transaction.notes));
-  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const [busy, setBusy] = useState<'approve' | 'reject' | 'bill' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const categoryRef = useRef<HTMLSelectElement>(null);
   const cardRef = useRef<HTMLElement>(null);
@@ -85,7 +88,7 @@ export function ReconciliationCard({
   const subcategory = category?.children.find((item) => item.id === subcategoryId);
   const target = category ? [category.name, subcategory?.name].filter(Boolean).join(' › ') : null;
 
-  async function run(action: 'approve' | 'reject') {
+  async function run(action: 'approve' | 'reject' | 'bill') {
     if (busy) return;
     if (action === 'approve' && !categoryId) {
       setError('Escolha uma categoria antes de aprovar.');
@@ -97,6 +100,7 @@ export function ReconciliationCard({
     setError(null);
     try {
       if (action === 'approve') await onApprove(categoryId as string, subcategoryId, notes);
+      else if (action === 'bill') await onBillPayment();
       else await onReject(notes);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível salvar. Tente de novo.');
@@ -233,6 +237,21 @@ export function ReconciliationCard({
               <Check className="h-4 w-4" aria-hidden />
             )}
             <span className="truncate">{target ? `Aprovar como ${target}` : 'Aprovar'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-lg px-3 text-sm font-medium text-ink-2 transition hover:bg-surface-2 hover:text-ink disabled:opacity-50 sm:ml-auto sm:self-auto"
+            disabled={busy !== null}
+            onClick={() => void run('bill')}
+            title="Pagar a fatura não é gasto novo: as compras do cartão já são conciliadas uma a uma. Tira esta transação (e o outro lado do pagamento) da fila."
+          >
+            {busy === 'bill' ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <CreditCard className="h-4 w-4" aria-hidden />
+            )}
+            É pagamento de fatura
           </button>
 
           <button
