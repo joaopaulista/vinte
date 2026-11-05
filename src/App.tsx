@@ -13,6 +13,7 @@ import Accounts from '@/pages/Accounts';
 import Settings from '@/pages/Settings';
 import Categories from '@/pages/Categories';
 import Analytics from '@/pages/Analytics';
+import Reports from '@/pages/Reports';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
 
@@ -44,6 +45,7 @@ export default function App() {
             >
               <Route path="/" element={<Home />} />
               <Route path="/analises" element={<Analytics />} />
+              <Route path="/relatorios" element={<Reports />} />
               <Route path="/conciliacao" element={<Reconciliation />} />
               <Route path="/transacoes" element={<Transactions />} />
               <Route path="/contas" element={<Accounts />} />

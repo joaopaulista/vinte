@@ -26,11 +26,31 @@ export interface FetchTransactionsOptions extends Partial<TransactionFilters> {
 export async function fetchTransactions(
   options: FetchTransactionsOptions = {},
 ): Promise<TransactionWithRelations[]> {
+  if (options.limit) return fetchTransactionsPage(options, 0, options.limit);
+
+  // O PostgREST devolve no máximo 1.000 linhas por pedido: períodos longos
+  // (relatório de 12 meses, por exemplo) são buscados em páginas.
+  const all: TransactionWithRelations[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const page = await fetchTransactionsPage(options, offset, PAGE_SIZE);
+    all.push(...page);
+    if (page.length < PAGE_SIZE) return all;
+  }
+}
+
+const PAGE_SIZE = 1000;
+
+async function fetchTransactionsPage(
+  options: FetchTransactionsOptions,
+  offset: number,
+  size: number,
+): Promise<TransactionWithRelations[]> {
   let query = supabase
     .from('transactions')
     .select(TRANSACTION_SELECT)
     .order('transaction_date', { ascending: false })
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (options.status && options.status !== 'all') {
     query = query.eq('reconciliation_status', options.status);
@@ -52,11 +72,7 @@ export async function fetchTransactions(
     query = query.ilike('description', `%${options.search.trim()}%`);
   }
 
-  if (options.limit) {
-    query = query.limit(options.limit);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await query.range(offset, offset + size - 1);
   if (error) throw error;
 
   // O PostgREST devolve os embeds como array quando não consegue inferir a

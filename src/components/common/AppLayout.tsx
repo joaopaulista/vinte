@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   CheckCircle2,
+  FileBarChart,
   Home,
   ListOrdered,
   LogOut,
@@ -39,6 +40,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Home', icon: Home, keywords: 'inicio painel resumo' },
   { to: '/analises', label: 'Análises', icon: BarChart3, keywords: 'graficos faturas custos fixos' },
+  { to: '/relatorios', label: 'Relatórios', icon: FileBarChart, keywords: 'ganhos gastos periodo categoria exportar csv' },
   { to: '/conciliacao', label: 'Conciliação', icon: CheckCircle2, showPendingBadge: true, keywords: 'pendentes aprovar extrato' },
   { to: '/transacoes', label: 'Transações', icon: ListOrdered, keywords: 'lancamentos movimentacoes lancar' },
   { to: '/contas', label: 'Contas', icon: Wallet, keywords: 'bancos saldo responsaveis manual dinheiro' },
