@@ -11,6 +11,7 @@ import {
   Moon,
   PanelRightClose,
   PanelRightOpen,
+  Search,
   Settings as SettingsIcon,
   Sun,
   Tags,
@@ -23,22 +24,26 @@ import { usePendingCount } from '@/contexts/PendingCountContext';
 import { syncTransactions } from '@/services/pluggyService';
 import type { SyncResult } from '@/types';
 import { Logo, LogoMark } from './Logo';
+import { GlobalSearch } from './GlobalSearch';
+import type { SearchPage } from './GlobalSearch';
 
 interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
   showPendingBadge?: boolean;
+  /** Palavras que também acham a tela na pesquisa geral. */
+  keywords?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Home', icon: Home },
-  { to: '/analises', label: 'Análises', icon: BarChart3 },
-  { to: '/conciliacao', label: 'Conciliação', icon: CheckCircle2, showPendingBadge: true },
-  { to: '/transacoes', label: 'Transações', icon: ListOrdered },
-  { to: '/contas', label: 'Contas', icon: Wallet },
-  { to: '/categorias', label: 'Categorias', icon: Tags },
-  { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon },
+  { to: '/', label: 'Home', icon: Home, keywords: 'inicio painel resumo' },
+  { to: '/analises', label: 'Análises', icon: BarChart3, keywords: 'graficos faturas custos fixos' },
+  { to: '/conciliacao', label: 'Conciliação', icon: CheckCircle2, showPendingBadge: true, keywords: 'pendentes aprovar extrato' },
+  { to: '/transacoes', label: 'Transações', icon: ListOrdered, keywords: 'lancamentos movimentacoes lancar' },
+  { to: '/contas', label: 'Contas', icon: Wallet, keywords: 'bancos saldo responsaveis manual dinheiro' },
+  { to: '/categorias', label: 'Categorias', icon: Tags, keywords: 'metas limites orcamento' },
+  { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon, keywords: 'tema perfil' },
 ];
 
 /**
@@ -57,6 +62,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -69,6 +75,21 @@ export function AppLayout() {
     const timer = window.setTimeout(() => setSyncMessage(null), 5000);
     return () => window.clearTimeout(timer);
   }, [syncMessage]);
+
+  // Ctrl+K (⌘K no Mac) ou "/" fora de um campo abrem a pesquisa geral.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.closest('input, textarea, select, [contenteditable="true"]');
+      if ((event.key === 'k' && (event.ctrlKey || event.metaKey)) || (event.key === '/' && !typing)) {
+        event.preventDefault();
+        setMenuOpen(false);
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Trocar de página fecha o menu.
   useEffect(() => {
@@ -133,6 +154,7 @@ export function AppLayout() {
           <LogoMark motion={markMotion} className="h-8 w-8" />
         </SyncButton>
         <div className="flex items-center gap-1">
+          <SearchButton onOpen={() => setSearchOpen(true)} />
           <ThemeToggle />
           <button
             type="button"
@@ -174,6 +196,8 @@ export function AppLayout() {
         >
           <PanelRightOpen className="h-5 w-5" aria-hidden />
         </button>
+
+        <SearchButton onOpen={() => setSearchOpen(true)} />
 
         <span className="my-2 h-px w-8 bg-line" aria-hidden />
 
@@ -270,6 +294,21 @@ export function AppLayout() {
               </button>
             </div>
 
+            <div className="px-3 pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setSearchOpen(true);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border border-line px-3 py-2 text-sm text-ink-3 transition hover:border-ink-3 hover:text-ink"
+              >
+                <Search className="h-4 w-4" aria-hidden />
+                <span className="flex-1 text-left">Pesquisar…</span>
+                <kbd className="rounded border border-line px-1.5 text-[10px]">Ctrl K</kbd>
+              </button>
+            </div>
+
             <nav className="flex flex-col gap-1 px-3">
               {NAV_ITEMS.map(({ to, label, icon: Icon, showPendingBadge }) => (
                 <NavLink
@@ -315,7 +354,25 @@ export function AppLayout() {
           </aside>
         </div>
       )}
+
+      {searchOpen && <GlobalSearch pages={SEARCH_PAGES} onClose={() => setSearchOpen(false)} />}
     </div>
+  );
+}
+
+const SEARCH_PAGES: SearchPage[] = NAV_ITEMS.map(({ to, label, icon, keywords }) => ({ to, label, icon, keywords }));
+
+function SearchButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="grid h-10 w-10 place-items-center rounded-lg text-ink-2 transition hover:bg-surface-2 hover:text-ink"
+      aria-label="Pesquisar (Ctrl+K)"
+      title="Pesquisar (Ctrl+K)"
+    >
+      <Search className="h-5 w-5" aria-hidden />
+    </button>
   );
 }
 

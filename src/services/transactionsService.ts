@@ -244,3 +244,22 @@ export async function deleteManualEntry(transactionId: string): Promise<void> {
   const { error } = await supabase.from('transactions').delete().eq('id', transactionId).eq('manual_entry', true);
   if (error) throw error;
 }
+
+/**
+ * Busca textual para a pesquisa geral: descrição ou observação contendo o
+ * termo. Vírgulas e parênteses têm significado no filtro `or` do PostgREST,
+ * então viram espaço.
+ */
+export async function searchTransactionsText(term: string, limit: number): Promise<TransactionWithRelations[]> {
+  const safe = term.replace(/[,()*%\\]/g, ' ').trim();
+  if (!safe) return [];
+  const pattern = `%${safe.replace(/\s+/g, '%')}%`;
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(TRANSACTION_SELECT)
+    .or(`description.ilike.${pattern},notes.ilike.${pattern}`)
+    .order('transaction_date', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(normalizeTransaction);
+}

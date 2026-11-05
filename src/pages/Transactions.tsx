@@ -28,7 +28,11 @@ const EMPTY_FILTERS: Filters = {
 export default function Transactions() {
   const [searchParams, setSearchParams] = useSearchParams();
   // `?busca=` vem da pesquisa geral; `?lancar=<conta>` abre o lançamento manual.
-  const [filters, setFilters] = useState<Filters>(() => ({ ...EMPTY_FILTERS, search: searchParams.get('busca') ?? '' }));
+  const [filters, setFilters] = useState<Filters>(() => ({
+    ...EMPTY_FILTERS,
+    search: searchParams.get('busca') ?? '',
+    categoryId: searchParams.get('categoria') ?? 'all',
+  }));
   const [manualAccounts, setManualAccounts] = useState<AccountWithConnection[]>([]);
   // Lançamento aberto no diálogo: `null` = novo; `undefined` = fechado.
   const [entry, setEntry] = useState<TransactionWithRelations | null | undefined>(
@@ -44,9 +48,13 @@ export default function Transactions() {
 
   // A pesquisa geral pode mudar o termo com a página já aberta.
   const searchParam = searchParams.get('busca');
+  const categoryParam = searchParams.get('categoria');
   useEffect(() => {
     if (searchParam !== null) setFilters((current) => ({ ...current, search: searchParam }));
   }, [searchParam]);
+  useEffect(() => {
+    if (categoryParam !== null) setFilters((current) => ({ ...current, categoryId: categoryParam }));
+  }, [categoryParam]);
 
   function closeEntry() {
     setEntry(undefined);
