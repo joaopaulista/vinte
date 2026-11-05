@@ -1,5 +1,5 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { installmentsOf, isCreditCard, isSettled, PluggyClient, signedAmount } from './pluggy.ts';
+import { installmentsOf, isCreditCard, PluggyClient, signedAmount } from './pluggy.ts';
 import { isUuid, PublicError } from './http.ts';
 
 export interface SyncTarget {
@@ -66,13 +66,34 @@ export async function syncConnection(
     if (accountError) throw accountError;
     accountsSynced += 1;
 
-    const transactions = (await pluggy.listTransactions(pluggyAccount.id, dateFrom)).filter(
-      isSettled,
-    );
-    if (transactions.length === 0) continue;
+    // Entram também as PENDING: no cartão, vários bancos deixam assim as
+    // compras da fatura aberta até o fechamento (migration 0016).
+    const transactions = await pluggy.listTransactions(pluggyAccount.id, dateFrom);
 
     // Parcela ("6 de 8") só existe em cartão; em conta corrente fica nulo.
     const onCard = isCreditCard(pluggyAccount);
+
+    // Compra que o banco tinha mandado em aberto e deixou de mandar (cancelada,
+    // ou liquidada com outro id): sai, para não contar em dobro nem ficar
+    // fantasma. Só olha a janela que acabou de ser consultada.
+    const returnedIds = new Set(transactions.map((transaction) => transaction.id));
+    const { data: stalePending, error: staleError } = await supabase
+      .from('transactions')
+      .select('id, pluggy_transaction_id')
+      .eq('account_id', account.id)
+      .eq('bank_status', 'PENDING')
+      .gte('transaction_date', dateFrom);
+    if (staleError) throw staleError;
+    const vanished = (stalePending ?? []).filter((row) => !returnedIds.has(row.pluggy_transaction_id));
+    if (vanished.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('transactions')
+        .delete()
+        .in('id', vanished.map((row) => row.id));
+      if (deleteError) throw deleteError;
+    }
+
+    if (transactions.length === 0) continue;
 
     // `ignoreDuplicates` é essencial: sem ele, um re-sync sobrescreveria a
     // categoria e o status de transações que o usuário já conciliou.
@@ -90,6 +111,7 @@ export async function syncConnection(
           // Usada pela migration 0009 para reconhecer pagamento de fatura.
           pluggy_category: transaction.category ?? null,
           ...(onCard ? installmentsOf(transaction) : {}),
+          bank_status: transaction.status === 'PENDING' ? 'PENDING' : 'POSTED',
           reconciliation_status: 'pending',
         })),
         { onConflict: 'user_id,pluggy_transaction_id', ignoreDuplicates: true },
@@ -99,31 +121,25 @@ export async function syncConnection(
     if (insertError) throw insertError;
     transactionsInserted += inserted?.length ?? 0;
 
-    // Transações que já existiam (importadas antes das parcelas serem
-    // guardadas) recebem os dados de parcela agora. O upsert só atualiza as
-    // colunas enviadas aqui — categoria, status e observação da conciliação
-    // não estão na lista e ficam intactos. Valor e data vão só porque são
-    // obrigatórios na linha, e são os mesmos do Pluggy.
-    if (onCard) {
-      const withInstallments = transactions.filter(
-        (transaction) => (transaction.creditCardMetadata?.totalInstallments ?? 0) > 1,
-      );
-      if (withInstallments.length > 0) {
-        const { error: metadataError } = await supabase.from('transactions').upsert(
-          withInstallments.map((transaction) => ({
-            user_id: target.userId,
-            account_id: account.id,
-            pluggy_transaction_id: transaction.id,
-            amount: signedAmount(transaction),
-            transaction_date: transaction.date.slice(0, 10),
-            pluggy_category: transaction.category ?? null,
-            ...installmentsOf(transaction),
-          })),
-          { onConflict: 'user_id,pluggy_transaction_id' },
-        );
-        if (metadataError) throw metadataError;
-      }
-    }
+    // As que já existiam recebem o que o banco diz delas agora: valor, data e
+    // descrição (que mudam quando a compra em aberto é liquidada), situação no
+    // banco e parcelas. O upsert só atualiza as colunas enviadas — categoria,
+    // status e observação da conciliação ficam intactos.
+    const { error: refreshError } = await supabase.from('transactions').upsert(
+      transactions.map((transaction) => ({
+        user_id: target.userId,
+        account_id: account.id,
+        pluggy_transaction_id: transaction.id,
+        description: transaction.description,
+        amount: signedAmount(transaction),
+        transaction_date: transaction.date.slice(0, 10),
+        pluggy_category: transaction.category ?? null,
+        bank_status: transaction.status === 'PENDING' ? 'PENDING' : 'POSTED',
+        ...(onCard ? installmentsOf(transaction) : {}),
+      })),
+      { onConflict: 'user_id,pluggy_transaction_id' },
+    );
+    if (refreshError) throw refreshError;
   }
 
   await supabase

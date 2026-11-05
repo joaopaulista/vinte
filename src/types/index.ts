@@ -92,6 +92,8 @@ export interface Transaction {
    * dia 1 do mês seguinte (migration 0014). Painéis e relatórios usam esta.
    */
   accounting_date: string;
+  /** PENDING: o banco ainda não liquidou (ex.: compra na fatura aberta). Migration 0016. */
+  bank_status: 'PENDING' | 'POSTED';
   created_at: string;
 }
 

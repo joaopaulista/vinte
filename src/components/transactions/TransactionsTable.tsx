@@ -46,6 +46,11 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
                   <p className="text-xs text-ink-3">
                     {transaction.account.name}
                     {transaction.manual_entry && ' · lançamento manual'}
+                    {transaction.bank_status === 'PENDING' && (
+                      <span title="O banco ainda não liquidou: valor e data podem mudar na próxima sincronização">
+                        {' · em aberto no banco'}
+                      </span>
+                    )}
                   </p>
                 )}
               </td>

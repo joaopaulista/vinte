@@ -29,7 +29,8 @@ export interface PluggyTransaction {
   date: string;
   type: 'DEBIT' | 'CREDIT';
   /** PENDING ainda pode mudar de valor ou sumir; POSTED está liquidada. */
-  status?: 'PENDING' | 'POSTED';  /** Categoria do próprio Pluggy (em inglês), ex.: "Credit card payment". */
+  status?: 'PENDING' | 'POSTED';
+  /** Categoria do próprio Pluggy (em inglês), ex.: "Credit card payment". */
   category?: string | null;
   /** Só em cartão de crédito. */
   creditCardMetadata?: {
@@ -157,15 +158,6 @@ export class PluggyClient {
 export function signedAmount(transaction: PluggyTransaction): number {
   const magnitude = Math.abs(transaction.amount);
   return transaction.type === 'DEBIT' ? -magnitude : magnitude;
-}
-
-/**
- * Só sincronizamos transações liquidadas. Uma PENDING ainda pode mudar de valor
- * ou desaparecer, e como o upsert usa `ignoreDuplicates` para não sobrescrever
- * conciliações, ela ficaria congelada com o valor errado.
- */
-export function isSettled(transaction: PluggyTransaction): boolean {
-  return transaction.status === undefined || transaction.status === 'POSTED';
 }
 
 export function isCreditCard(account: Pick<PluggyAccount, 'type' | 'subtype'>): boolean {
