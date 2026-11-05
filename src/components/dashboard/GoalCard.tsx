@@ -4,26 +4,27 @@ import { Target } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/hooks/useCategories';
 import { readGoals } from '@/services/goalsService';
-import { GoalRow, goalLabel, spentFor } from '@/components/goals/goalParts';
+import { GoalRow, goalLabel, progressFor } from '@/components/goals/goalParts';
 import type { TransactionWithRelations } from '@/types';
 
 /** Quanto tempo cada meta fica na tela antes de a próxima entrar. */
 const ROTATE_MS = 7000;
 
 interface GoalCardProps {
-  /** Despesas aprovadas do mês. */
-  expenses: TransactionWithRelations[];
+  /** Transações aprovadas do mês. */
+  monthTransactions: TransactionWithRelations[];
 }
 
 /**
- * Metas de gastos do mês: quanto de cada teto já foi usado e quanto ainda
- * resta. Mostra uma meta por vez; a cada 7 s a próxima entra pela direita.
- * Só acompanha; criar e editar metas fica em Categorias.
+ * Metas e limites do mês: quanto de cada meta já foi alcançado e quanto de
+ * cada limite já foi usado. Mostra um por vez (metas primeiro); a cada 7 s o
+ * próximo entra pela direita. Só acompanha; criar e editar fica em Categorias.
  */
-export function GoalCard({ expenses }: GoalCardProps) {
+export function GoalCard({ monthTransactions }: GoalCardProps) {
   const { user } = useAuth();
   const { byId } = useCategories();
-  const goals = readGoals(user);
+  // Metas (o que atingir) antes dos limites (o que não passar).
+  const goals = readGoals(user).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'target' ? -1 : 1));
   const [index, setIndex] = useState(0);
   // A meta que está saindo pela esquerda enquanto a nova entra.
   const [leaving, setLeaving] = useState<number | null>(null);
@@ -50,7 +51,14 @@ export function GoalCard({ expenses }: GoalCardProps) {
 
   const renderGoal = (position: number) => {
     const goal = goals[position];
-    return <GoalRow label={goalLabel(goal, byId)} spent={spentFor(goal, expenses)} limit={goal.limit} />;
+    return (
+      <GoalRow
+        label={`${goal.kind === 'target' ? 'Meta' : 'Limite'} · ${goalLabel(goal, byId)}`}
+        kind={goal.kind}
+        value={progressFor(goal, monthTransactions)}
+        amount={goal.limit}
+      />
+    );
   };
 
   return (
@@ -63,7 +71,7 @@ export function GoalCard({ expenses }: GoalCardProps) {
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-ink-2">
-          Metas do mês
+          Metas e limites
           {count > 1 && (
             <span className="ml-1 font-normal text-ink-3 num">
               {current + 1}/{count}
@@ -75,7 +83,7 @@ export function GoalCard({ expenses }: GoalCardProps) {
 
       {count === 0 ? (
         <p className="mt-1.5 text-sm text-ink-2">
-          Nenhuma meta definida. Cadastre em{' '}
+          Nenhuma meta ou limite definido. Cadastre em{' '}
           <Link to="/categorias" className="font-medium text-ink underline underline-offset-4 hover:text-accent">
             Categorias
           </Link>

@@ -69,6 +69,7 @@ export default function Home() {
       day,
       monthName: capitalize(MONTH_LONG.format(today)),
       comparisonLabel: `vs. ${day === 1 ? '1' : `1–${day}`} ${MONTH_SHORT.format(previousMonth).replace('.', '')}`,
+      monthTransactions,
       monthExpenses: monthTransactions.filter((transaction) => transaction.amount < 0),
       current: summarize(monthTransactions),
       previous: summarize(previousSamePeriod),
@@ -238,7 +239,7 @@ export default function Home() {
               icon={Scale}
               hint="Receitas menos despesas"
             />
-            <GoalCard expenses={metrics.monthExpenses} />
+            <GoalCard monthTransactions={metrics.monthTransactions} />
           </div>
 
           {/* Desktop: os dois gráficos lado a lado, ocupando o resto da tela. */}

@@ -3,22 +3,40 @@ import type { FormEvent } from 'react';
 import { Loader2, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { readGoals, saveGoals } from '@/services/goalsService';
-import type { ExpenseGoal } from '@/services/goalsService';
-import { formatCurrency } from '@/utils/format';
+import type { ExpenseGoal, GoalKind } from '@/services/goalsService';
+import { formatCurrency, parseMoney, toMoneyInput } from '@/utils/format';
 import type { Category, CategoryTree, TransactionWithRelations } from '@/types';
 
-/** O formulário aberto: uma meta nova (`goalId` nulo) ou a edição de uma existente. */
+/** O formulário aberto: um item novo (`goalId` nulo) ou a edição de um existente. */
 export interface GoalDraft {
   goalId: string | null;
+  kind: GoalKind;
   categoryId: string | null;
   subcategoryId: string | null;
   limit: string;
 }
 
-/** Estado e ações de criar, editar e excluir metas, comum à Home e a Categorias. */
-export function useGoalEditor() {
+/** Textos que mudam entre meta (atingir) e limite (não ultrapassar). */
+export const KIND_COPY = {
+  limit: {
+    singular: 'limite',
+    field: 'Não ultrapassar (R$)',
+    all: 'Todas as despesas',
+    save: 'Salvar limite',
+  },
+  target: {
+    singular: 'meta',
+    field: 'Atingir (R$)',
+    all: 'Saldo do mês (economia)',
+    save: 'Salvar meta',
+  },
+} as const;
+
+/** Estado e ações de criar, editar e excluir metas e limites de um tipo. */
+export function useGoalEditor(kind: GoalKind) {
   const { user } = useAuth();
-  const goals = readGoals(user);
+  const allGoals = readGoals(user);
+  const goals = allGoals.filter((goal) => goal.kind === kind);
   const [draft, setDraft] = useState<GoalDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,9 +44,10 @@ export function useGoalEditor() {
   function open(goal?: ExpenseGoal) {
     setDraft({
       goalId: goal?.id ?? null,
+      kind,
       categoryId: goal?.categoryId ?? null,
       subcategoryId: goal?.subcategoryId ?? null,
-      limit: goal ? String(goal.limit).replace('.', ',') : '',
+      limit: goal ? toMoneyInput(goal.limit).replace(/,00$/, '') : '',
     });
     setError(null);
   }
@@ -40,7 +59,7 @@ export function useGoalEditor() {
       await saveGoals(next);
       setDraft(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível salvar a meta.');
+      setError(cause instanceof Error ? cause.message : `Não foi possível salvar o ${KIND_COPY[kind].singular}.`);
     } finally {
       setSaving(false);
     }
@@ -48,24 +67,23 @@ export function useGoalEditor() {
 
   async function submit() {
     if (!draft) return;
-    // Aceita "2.500,50", "1.500" e "2500.50".
-    const normalized = draft.limit.trim().replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
-    const limit = Number(normalized);
-    if (normalized === '' || !Number.isFinite(limit) || limit <= 0) {
+    const limit = parseMoney(draft.limit);
+    if (limit === null || limit <= 0) {
       setError('Informe um valor maior que zero.');
       return;
     }
     const { categoryId, subcategoryId } = draft;
-    // Uma meta por alvo: definir de novo a mesma categoria substitui a anterior.
+    // Um item por alvo e tipo: definir de novo a mesma categoria substitui o anterior.
     const sameTarget = goals.find(
       (goal) => goal.categoryId === categoryId && goal.subcategoryId === subcategoryId,
     );
     const id = draft.goalId ?? sameTarget?.id ?? crypto.randomUUID();
-    const others = goals.filter((goal) => goal.id !== id && goal !== sameTarget);
-    await persist([...others, { id, categoryId, subcategoryId, limit }]);
+    const others = allGoals.filter((goal) => goal.id !== id && goal !== sameTarget);
+    await persist([...others, { id, kind, categoryId, subcategoryId, limit }]);
   }
 
   return {
+    kind,
     goals,
     draft,
     setDraft,
@@ -74,13 +92,13 @@ export function useGoalEditor() {
     open,
     close: () => setDraft(null),
     submit,
-    remove: (id: string) => persist(goals.filter((goal) => goal.id !== id)),
+    remove: (id: string) => persist(allGoals.filter((goal) => goal.id !== id)),
   };
 }
 
 export type GoalEditor = ReturnType<typeof useGoalEditor>;
 
-/** Campos da meta: categoria e subcategoria opcionais e o teto do mês. */
+/** Campos: categoria e subcategoria opcionais e o valor do mês. */
 export function GoalForm({
   editor,
   tree,
@@ -90,8 +108,9 @@ export function GoalForm({
   tree: CategoryTree[];
   idPrefix: string;
 }) {
-  const { draft, setDraft, saving, error } = editor;
+  const { draft, setDraft, saving, error, kind } = editor;
   if (!draft) return null;
+  const copy = KIND_COPY[kind];
   const subcategories = tree.find((category) => category.id === draft.categoryId)?.children ?? [];
 
   function handleSubmit(event: FormEvent) {
@@ -115,7 +134,7 @@ export function GoalForm({
             // Trocar a categoria invalida a subcategoria escolhida antes.
             onChange={(event) => setDraft({ ...draft, categoryId: event.target.value || null, subcategoryId: null })}
           >
-            <option value="">Todas</option>
+            <option value="">{kind === 'target' ? 'Nenhuma: saldo do mês' : 'Todas'}</option>
             {tree.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -146,13 +165,13 @@ export function GoalForm({
 
       <div>
         <label className="mb-0.5 block text-xs text-ink-2" htmlFor={`${idPrefix}-limit`}>
-          Não ultrapassar (R$)
+          {copy.field}
         </label>
         <input
           id={`${idPrefix}-limit`}
           className="field py-1.5"
           inputMode="decimal"
-          placeholder="Ex.: 1.500"
+          placeholder={kind === 'target' ? 'Ex.: 1.000' : 'Ex.: 1.500'}
           value={draft.limit}
           onChange={(event) => setDraft({ ...draft, limit: event.target.value })}
           disabled={saving}
@@ -170,7 +189,7 @@ export function GoalForm({
       <div className="flex items-center gap-1.5">
         <button type="submit" className="btn-primary min-h-8 flex-1 px-3 py-1 text-xs" disabled={saving}>
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
-          Salvar meta
+          {copy.save}
         </button>
         <button type="button" className="btn-secondary min-h-8 px-3 py-1 text-xs" onClick={editor.close} disabled={saving}>
           Cancelar
@@ -181,8 +200,8 @@ export function GoalForm({
             className="btn-secondary min-h-8 px-2 py-1 text-danger-ink"
             onClick={() => void editor.remove(draft.goalId as string)}
             disabled={saving}
-            aria-label="Excluir meta"
-            title="Excluir meta"
+            aria-label={`Excluir ${copy.singular}`}
+            title={`Excluir ${copy.singular}`}
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
           </button>
@@ -192,22 +211,49 @@ export function GoalForm({
   );
 }
 
-/** Uma meta com a barra de quanto já foi usado no mês. */
+/** Um limite ou uma meta com a barra de andamento do mês. */
 export function GoalRow({
   label,
-  spent,
-  limit,
+  kind,
+  value,
+  amount,
   onEdit,
 }: {
   label: string;
-  spent: number;
-  limit: number;
+  kind: GoalKind;
+  /** Quanto já foi gasto (limite) ou alcançado (meta). */
+  value: number;
+  /** O teto (limite) ou o alvo (meta). */
+  amount: number;
   /** Sem `onEdit`, a linha só mostra o andamento (como na Home). */
   onEdit?: () => void;
 }) {
-  const share = spent / limit;
-  const over = spent > limit;
-  const tone = over ? 'bg-danger' : share >= 0.8 ? 'bg-gold' : 'bg-success';
+  const share = Math.max(0, value) / amount;
+  const isTarget = kind === 'target';
+  const over = !isTarget && value > amount;
+  const reached = isTarget && value >= amount;
+  const tone = isTarget
+    ? reached
+      ? 'bg-success'
+      : 'bg-mint/60'
+    : over
+      ? 'bg-danger'
+      : share >= 0.8
+        ? 'bg-gold'
+        : 'bg-success';
+
+  let status: string;
+  if (isTarget) {
+    status = reached
+      ? value > amount
+        ? `Meta atingida · ${formatCurrency(value - amount)} além`
+        : 'Meta atingida'
+      : `${(share * 100).toFixed(0)}% alcançado · faltam ${formatCurrency(amount - value)}`;
+  } else {
+    status = over
+      ? `Passou ${formatCurrency(value - amount)} do limite`
+      : `${(share * 100).toFixed(0)}% usado · restam ${formatCurrency(amount - value)}`;
+  }
 
   return (
     <div>
@@ -220,45 +266,63 @@ export function GoalRow({
             type="button"
             onClick={onEdit}
             className="-m-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 transition hover:bg-surface-2 hover:text-ink"
-            aria-label={`Editar meta: ${label}`}
-            title="Editar meta"
+            aria-label={`Editar ${KIND_COPY[kind].singular}: ${label}`}
+            title={`Editar ${KIND_COPY[kind].singular}`}
           >
             <Pencil className="h-3 w-3" aria-hidden />
           </button>
         )}
       </div>
       <p className="text-sm font-semibold text-ink num">
-        {formatCurrency(spent)}
-        <span className="text-xs font-normal text-ink-2"> de {formatCurrency(limit)}</span>
+        {formatCurrency(value)}
+        <span className="text-xs font-normal text-ink-2"> de {formatCurrency(amount)}</span>
       </p>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.min(100, share * 100)}%` }} />
       </div>
-      <p className={`mt-0.5 text-xs ${over ? 'font-medium text-danger-ink' : 'text-ink-2'}`}>
-        {over
-          ? `Passou ${formatCurrency(spent - limit)} da meta`
-          : `${(share * 100).toFixed(0)}% usado · restam ${formatCurrency(limit - spent)}`}
+      <p
+        className={`mt-0.5 text-xs ${
+          over ? 'font-medium text-danger-ink' : reached ? 'font-medium text-success-ink' : 'text-ink-2'
+        }`}
+      >
+        {status}
       </p>
     </div>
   );
 }
 
 export function goalLabel(goal: ExpenseGoal, byId: Map<string, Category>): string {
-  if (!goal.categoryId) return 'Todas as despesas';
+  if (!goal.categoryId) return KIND_COPY[goal.kind].all;
   const category = byId.get(goal.categoryId)?.name ?? 'Categoria removida';
   const subcategory = goal.subcategoryId ? byId.get(goal.subcategoryId)?.name : null;
   return subcategory ? `${category} › ${subcategory}` : category;
 }
 
-/** Quanto das despesas do mês cai dentro da meta. */
-export function spentFor(goal: ExpenseGoal, expenses: TransactionWithRelations[]): number {
-  return expenses
-    .filter((transaction) =>
-      goal.subcategoryId
-        ? transaction.subcategory_id === goal.subcategoryId
-        : goal.categoryId
-          ? transaction.category_id === goal.categoryId
-          : true,
-    )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+function inTarget(goal: ExpenseGoal, transaction: TransactionWithRelations): boolean {
+  if (goal.subcategoryId) return transaction.subcategory_id === goal.subcategoryId;
+  if (goal.categoryId) return transaction.category_id === goal.categoryId;
+  return true;
+}
+
+/**
+ * Andamento do mês a partir das transações aprovadas do mês:
+ *  - limite: soma das despesas que caem nele;
+ *  - meta sem categoria: saldo do mês (receitas − despesas);
+ *  - meta com categoria: total movimentado na categoria, em valor absoluto
+ *    (serve para "investir R$ 1.000" e para "receber R$ 3.000").
+ */
+export function progressFor(goal: ExpenseGoal, monthTransactions: TransactionWithRelations[]): number {
+  if (goal.kind === 'limit') {
+    return monthTransactions
+      .filter((transaction) => transaction.amount < 0 && inTarget(goal, transaction))
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  }
+  if (!goal.categoryId) {
+    return monthTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  }
+  return Math.abs(
+    monthTransactions
+      .filter((transaction) => inTarget(goal, transaction))
+      .reduce((sum, transaction) => sum + transaction.amount, 0),
+  );
 }
