@@ -41,6 +41,9 @@ export interface Account {
   initial_balance: number;
   /** Responsável interno pela conta (ver migration 0012). */
   owner_id: string | null;
+  /** Cartão: dia do fechamento e do vencimento da fatura (migration 0014). */
+  closing_day: number | null;
+  due_day: number | null;
   updated_at: string;
   created_at: string;
 }
@@ -83,6 +86,12 @@ export interface Transaction {
   purchase_date: string | null;
   /** Lançado à mão numa conta manual: pode ser editado e excluído (migration 0013). */
   manual_entry: boolean;
+  /**
+   * Data de competência: a que mês o lançamento pertence. Igual à data da
+   * transação, exceto compra no cartão depois do fechamento, que vai para o
+   * dia 1 do mês seguinte (migration 0014). Painéis e relatórios usam esta.
+   */
+  accounting_date: string;
   created_at: string;
 }
 

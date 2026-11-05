@@ -74,7 +74,7 @@ export function monthlyMetric(
 ): MonthlyPoint[] {
   const byMonth = new Map<string, TransactionWithRelations[]>();
   for (const transaction of transactions) {
-    const key = monthKeyOf(transaction.transaction_date);
+    const key = monthKeyOf(transaction.accounting_date);
     const bucket = byMonth.get(key) ?? [];
     bucket.push(transaction);
     byMonth.set(key, bucket);
@@ -206,7 +206,7 @@ export function inMonths(
   keys: string[],
 ): TransactionWithRelations[] {
   const set = new Set(keys);
-  return transactions.filter((transaction) => set.has(monthKeyOf(transaction.transaction_date)));
+  return transactions.filter((transaction) => set.has(monthKeyOf(transaction.accounting_date)));
 }
 
 function round2(value: number): number {
@@ -230,7 +230,7 @@ export function billPaymentsByMonth(
 
   for (const transaction of transactions) {
     if (!transaction.bill_payment) continue;
-    const key = monthKeyOf(transaction.transaction_date);
+    const key = monthKeyOf(transaction.accounting_date);
     const target = transaction.amount < 0 ? outflow : inflow;
     target.set(key, (target.get(key) ?? 0) + Math.abs(transaction.amount));
   }

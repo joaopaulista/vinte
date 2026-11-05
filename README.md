@@ -36,6 +36,7 @@ arquivos de `supabase/migrations/` **na ordem**:
 11. `0011_manual_accounts.sql` — contas manuais (dinheiro, contas sem Open Finance) com saldo calculado pelos lançamentos
 12. `0012_account_owners.sql` — responsáveis internos por conta (quem cuida de cada banco)
 13. `0013_manual_entries.sql` — lançamentos manuais (só em contas manuais)
+14. `0014_card_closing_day.sql` — fechamento e vencimento do cartão; compra depois do fechamento conta no mês seguinte
 
 ### 2. Configurar as variáveis
 

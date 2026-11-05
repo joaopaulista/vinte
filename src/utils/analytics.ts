@@ -37,7 +37,7 @@ export function buildMonthlySeries(
   const totals = new Map<string, { income: number; expense: number }>();
 
   for (const transaction of transactions) {
-    const key = monthKeyOf(transaction.transaction_date);
+    const key = monthKeyOf(transaction.accounting_date);
     const bucket = totals.get(key) ?? { income: 0, expense: 0 };
 
     if (transaction.amount >= 0) {
@@ -141,10 +141,10 @@ export function detectAnomalies(
   for (const transaction of transactions) {
     if (transaction.amount >= 0) continue;
 
-    const day = Number(transaction.transaction_date.slice(8, 10));
+    const day = Number(transaction.accounting_date.slice(8, 10));
     if (day > dayCutoff) continue;
 
-    const monthKey = monthKeyOf(transaction.transaction_date);
+    const monthKey = monthKeyOf(transaction.accounting_date);
     const name = transaction.category?.name ?? 'Sem categoria';
     const value = Math.abs(transaction.amount);
 
@@ -190,7 +190,7 @@ export function filterByMonth(
   transactions: TransactionWithRelations[],
   key: string,
 ): TransactionWithRelations[] {
-  return transactions.filter((transaction) => monthKeyOf(transaction.transaction_date) === key);
+  return transactions.filter((transaction) => monthKeyOf(transaction.accounting_date) === key);
 }
 
 function round2(value: number): number {

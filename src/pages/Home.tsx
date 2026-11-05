@@ -69,7 +69,7 @@ export default function Home() {
     // Mesmo intervalo de dias do mês anterior: no dia 3, compara 1–3 com 1–3.
     // Comparar 3 dias com um mês inteiro daria "↓100%" todo começo de mês.
     const previousSamePeriod = filterByMonth(transactions, previousKey).filter(
-      (transaction) => Number(transaction.transaction_date.slice(8, 10)) <= day,
+      (transaction) => Number(transaction.accounting_date.slice(8, 10)) <= day,
     );
 
     return {

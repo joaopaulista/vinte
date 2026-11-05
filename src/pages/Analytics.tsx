@@ -200,8 +200,8 @@ export default function Analytics() {
     const previousScope = inMonths(byCategory, previousKeys).filter(
       (transaction) =>
         !partial ||
-        !transaction.transaction_date.startsWith(lastPrevious) ||
-        monthDay(transaction.transaction_date) <= day,
+        !transaction.accounting_date.startsWith(lastPrevious) ||
+        monthDay(transaction.accounting_date) <= day,
     );
 
     const label = (key: string) => formatMonthLabel(`${key}-01`);

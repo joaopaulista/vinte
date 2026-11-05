@@ -104,7 +104,7 @@ export function groupByPeriod(
     rows.set(key, { key, label: bucketLabel(cursor, granularity), income: 0, expense: 0, balance: 0, cumulative: 0, count: 0 });
   }
   for (const transaction of transactions) {
-    const key = toDateInputValue(bucketStart(parseDateOnly(transaction.transaction_date), granularity));
+    const key = toDateInputValue(bucketStart(parseDateOnly(transaction.accounting_date), granularity));
     const row = rows.get(key);
     if (!row) continue;
     if (transaction.amount >= 0) row.income += transaction.amount;

@@ -2,7 +2,7 @@ import { supabase, toError } from './supabaseClient';
 import type { AccountWithConnection, BankConnection } from '@/types';
 
 const ACCOUNT_SELECT = `id, user_id, bank_connection_id, pluggy_account_id, name, type, balance, currency,
-  is_manual, initial_balance, owner_id, updated_at, created_at,
+  is_manual, initial_balance, owner_id, closing_day, due_day, updated_at, created_at,
   bank_connection:bank_connections!accounts_bank_connection_id_fkey (id, institution_name, status)`;
 
 export async function fetchAccounts(): Promise<AccountWithConnection[]> {
@@ -89,5 +89,17 @@ export async function updateManualAccount(
 /** Apaga a conta manual e, junto (cascade), os lançamentos dela. */
 export async function deleteManualAccount(accountId: string): Promise<void> {
   const { error } = await supabase.from('accounts').delete().eq('id', accountId).eq('is_manual', true);
+  if (error) throw toError(error);
+}
+
+/** Dia do fechamento e do vencimento da fatura do cartão (1–31). */
+export async function updateCardDays(
+  accountId: string,
+  days: { closingDay: number | null; dueDay: number | null },
+): Promise<void> {
+  const { error } = await supabase
+    .from('accounts')
+    .update({ closing_day: days.closingDay, due_day: days.dueDay })
+    .eq('id', accountId);
   if (error) throw toError(error);
 }

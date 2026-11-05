@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { DescriptionLabel } from './DescriptionLabel';
-import { formatCurrency, formatDate } from '@/utils/format';
+import { formatCurrency, formatDate, formatMonthLabel } from '@/utils/format';
 import type { TransactionWithRelations } from '@/types';
 
 interface TransactionsTableProps {
@@ -30,6 +30,11 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
             <tr key={transaction.id} className="hover:bg-surface-2">
               <td className="px-4 py-2.5 whitespace-nowrap text-ink-2 num">
                 {formatDate(transaction.transaction_date)}
+                {transaction.accounting_date.slice(0, 7) !== transaction.transaction_date.slice(0, 7) && (
+                  <span className="block text-xs text-ink-3" title="Compra depois do fechamento: conta na fatura seguinte">
+                    conta em {formatMonthLabel(transaction.accounting_date)}
+                  </span>
+                )}
               </td>
               <td className="max-w-md px-4 py-3">
                 <DescriptionLabel

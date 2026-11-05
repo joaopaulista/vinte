@@ -74,7 +74,7 @@ function addMonths(key: string, count: number): string {
  * com o dia da compra; nesse caso a parcela 6 é "mês da compra + 5".
  */
 function billMonth(transaction: TransactionWithRelations): string {
-  const month = monthKeyOf(transaction.transaction_date);
+  const month = monthKeyOf(transaction.accounting_date);
   const number = transaction.installment_number ?? 1;
   if (transaction.purchase_date && number > 1 && monthKeyOf(transaction.purchase_date) === month) {
     return addMonths(month, number - 1);

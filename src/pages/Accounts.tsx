@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Building2, CreditCard, Landmark, Pencil, Plus, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, Building2, CalendarDays, CreditCard, Landmark, Pencil, Plus, Users, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ConnectBankButton } from '@/components/accounts/ConnectBankButton';
 import { ManualAccountDialog } from '@/components/accounts/ManualAccountDialog';
+import { CardDaysDialog } from '@/components/accounts/CardDaysDialog';
+import { nextCardCycle } from '@/utils/cardCycle';
 import { EmptyState } from '@/components/common/EmptyState';
 import { OwnerDot } from '@/components/owners/OwnerDot';
 import { OwnersDialog } from '@/components/owners/OwnersDialog';
@@ -28,6 +30,7 @@ export default function Accounts() {
   const [editingManual, setEditingManual] = useState<AccountWithConnection | null | undefined>(undefined);
   const { owners, reload: reloadOwners } = useOwners();
   const [ownersOpen, setOwnersOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState<AccountWithConnection | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -169,6 +172,7 @@ export default function Accounts() {
               )
             }
             credit
+            onEditCard={setEditingCard}
             {...ownerProps}
           />
         </div>
@@ -181,6 +185,17 @@ export default function Accounts() {
           onClose={() => setOwnersOpen(false)}
           onChanged={async () => {
             await Promise.all([reloadOwners(), load()]);
+          }}
+        />
+      )}
+
+      {editingCard && (
+        <CardDaysDialog
+          account={editingCard}
+          onClose={() => setEditingCard(null)}
+          onSaved={() => {
+            setEditingCard(null);
+            void load();
           }}
         />
       )}
@@ -224,6 +239,7 @@ function AccountSection({
   summary,
   credit = false,
   onEditManual,
+  onEditCard,
   owners,
   onChangeOwner,
 }: {
@@ -235,6 +251,7 @@ function AccountSection({
   summary?: ReactNode;
   credit?: boolean;
   onEditManual?: (account: AccountWithConnection) => void;
+  onEditCard?: (account: AccountWithConnection) => void;
   owners: AccountOwner[];
   onChangeOwner: (accountId: string, ownerId: string | null) => void;
 }) {
@@ -306,12 +323,52 @@ function AccountSection({
                   </>
                 )}
               </p>
+              {credit && onEditCard && <CardDays account={account} onEdit={() => onEditCard(account)} />}
               <OwnerSelect account={account} owners={owners} onChange={onChangeOwner} />
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+const SHORT_DATE = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' });
+
+/** Fechamento e vencimento do cartão, com o próximo ciclo calculado. */
+function CardDays({ account, onEdit }: { account: AccountWithConnection; onEdit: () => void }) {
+  const cycle = account.closing_day ? nextCardCycle(account.closing_day, account.due_day) : null;
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs text-ink-2">
+          <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+          Fatura
+          {!account.closing_day && <span className="font-medium text-warn-ink">· defina o fechamento</span>}
+        </p>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="-m-1 grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-3 transition hover:bg-surface-2 hover:text-ink"
+          aria-label={`Editar fechamento e vencimento de ${account.name ?? 'cartão'}`}
+          title="Editar fechamento e vencimento"
+        >
+          <Pencil className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      </div>
+      {cycle ? (
+        <p className="mt-1 text-sm text-ink">
+          Fecha dia {account.closing_day}
+          {account.due_day ? ` · vence dia ${account.due_day}` : ''}
+          <span className="block text-xs text-ink-3">
+            Próxima: fecha {SHORT_DATE.format(cycle.closing)}
+            {cycle.due ? `, vence ${SHORT_DATE.format(cycle.due)}` : ''}
+          </span>
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-ink-3">Sem fechamento, as compras contam na data em que foram feitas.</p>
+      )}
+    </div>
   );
 }
 
