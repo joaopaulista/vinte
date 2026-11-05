@@ -122,9 +122,9 @@ export function GlobalSearch({ pages, onClose }: { pages: SearchPage[]; onClose:
         id: `owner-${owner.id}`,
         group: 'Responsáveis',
         title: owner.name,
-        detail: 'Ver as contas',
+        detail: 'Ver a Home só com as contas dele(a)',
         icon: User,
-        to: '/contas',
+        to: `/?responsavel=${owner.id}`,
       });
     }
 

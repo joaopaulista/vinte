@@ -11,6 +11,8 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { Pagination } from '@/components/common/Pagination';
 import { Spinner } from '@/components/common/Spinner';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useOwners } from '@/hooks/useOwners';
+import { OwnerFilter, filterByOwner, useOwnerFilter } from '@/components/owners/OwnerFilter';
 import { usePagination } from '@/hooks/usePagination';
 import { usePendingCount } from '@/contexts/PendingCountContext';
 import {
@@ -47,10 +49,15 @@ export default function Home() {
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
 
   // Só transações aprovadas: pendentes e reprovadas distorceriam os números.
-  const { transactions, loading, error } = useTransactions({
+  const { transactions: allTransactions, loading, error } = useTransactions({
     status: 'approved',
     from: toDateInputValue(monthsAgo(MONTHS_IN_CHART)),
   });
+  // Filtro por responsável: a Home inteira passa a olhar só as contas dele.
+  const { owners, loading: ownersLoading } = useOwners();
+  const [ownerFilter, setOwnerFilter] = useOwnerFilter(owners, ownersLoading);
+  const transactions = useMemo(() => filterByOwner(allTransactions, ownerFilter), [allTransactions, ownerFilter]);
+  const ownerName = owners.find((owner) => owner.id === ownerFilter)?.name;
 
   const metrics = useMemo(() => {
     const today = new Date();
@@ -140,7 +147,7 @@ export default function Home() {
     );
   }
 
-  const hasApprovedData = transactions.length > 0;
+  const hasApprovedData = allTransactions.length > 0;
   const { current } = metrics;
   const categoryTotal = categoryRows.reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
   const listTotal = listRows.reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
@@ -151,11 +158,13 @@ export default function Home() {
         title="Home"
         description={
           !hasApprovedData || metrics.monthCount === 0 ? (
-            `${metrics.monthName} ainda não tem transações aprovadas.`
+            `${metrics.monthName} ainda não tem transações aprovadas${ownerName ? ` nas contas de ${ownerName}` : ''}.`
           ) : (
             // A resposta para "como está o mês?", antes de qualquer gráfico
             <p className="font-display text-lg font-medium leading-snug text-ink">
-              {metrics.monthName}, até hoje: entraram{' '}
+              {metrics.monthName}
+              {ownerName ? ` nas contas de ${ownerName}` : ownerFilter === 'none' ? ' nas contas sem responsável' : ''}, até
+              hoje: entraram{' '}
               <strong className="num font-semibold whitespace-nowrap text-success-ink">
                 {formatCurrency(current.income)}
               </strong>{' '}
@@ -186,6 +195,7 @@ export default function Home() {
             <time dateTime={toDateInputValue(new Date())} className="text-sm font-medium text-ink-2 first-letter:uppercase">
               {TODAY_LONG.format(new Date())}
             </time>
+            <OwnerFilter owners={owners} value={ownerFilter} onChange={setOwnerFilter} id="home-owner" />
             {pendingCount > 0 && (
               <Link
                 to="/conciliacao"
