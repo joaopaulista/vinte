@@ -15,6 +15,7 @@ import { usePendingCount } from '@/contexts/PendingCountContext';
 import { reopenTransaction } from '@/services/transactionsService';
 import { fetchAccounts } from '@/services/accountsService';
 import { formatCurrency, formatDate } from '@/utils/format';
+import { accountKindOf } from '@/utils/accountKind';
 import type { AccountWithConnection, TransactionFilters as Filters, TransactionWithRelations } from '@/types';
 
 const EMPTY_FILTERS: Filters = {
@@ -23,6 +24,7 @@ const EMPTY_FILTERS: Filters = {
   from: null,
   to: null,
   search: '',
+  accountKind: 'all',
 };
 
 export default function Transactions() {
@@ -65,9 +67,18 @@ export default function Transactions() {
   }
   // A busca é feita aqui, não no banco: precisa olhar campos que vêm de
   // outras tabelas (conta, categoria) e valores formatados ("231,45").
-  const { search, ...serverFilters } = filters;
+  const { search, accountKind = 'all', ...serverFilters } = filters;
   const { transactions: fetched, loading, error, reload } = useTransactions(serverFilters);
-  const transactions = useMemo(() => searchTransactions(fetched, search), [fetched, search]);
+  const transactions = useMemo(
+    () =>
+      searchTransactions(
+        accountKind === 'all'
+          ? fetched
+          : fetched.filter((transaction) => accountKindOf(transaction.account?.type) === accountKind),
+        search,
+      ),
+    [fetched, search, accountKind],
+  );
   const { tree } = useCategories();
   const { refreshPendingCount } = usePendingCount();
   const [reopeningId, setReopeningId] = useState<string | null>(null);

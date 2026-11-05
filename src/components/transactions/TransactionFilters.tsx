@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { FiltersPopover } from '@/components/common/FiltersPopover';
+import { ACCOUNT_KIND_LABELS } from '@/utils/accountKind';
+import type { AccountKind } from '@/utils/accountKind';
 import type { CategoryTree, TransactionFilters as Filters } from '@/types';
 
 interface TransactionFiltersProps {
@@ -24,6 +26,7 @@ export function TransactionFilters({ filters, tree, onChange, onReset }: Transac
   const activeCount =
     Number(filters.status !== 'all') +
     Number(filters.categoryId !== 'all') +
+    Number((filters.accountKind ?? 'all') !== 'all') +
     Number(Boolean(filters.from || filters.to));
 
   return (
@@ -70,6 +73,29 @@ export function TransactionFilters({ filters, tree, onChange, onReset }: Transac
             <option value="rejected">Reprovadas</option>
           </select>
         </label>
+
+        <fieldset>
+          <legend className="label">Conta</legend>
+          <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label="Tipo de conta">
+            {(['all', 'debit', 'credit', 'cash'] as const).map((kind) => {
+              const selected = (filters.accountKind ?? 'all') === kind;
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => patch({ accountKind: kind })}
+                  className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${
+                    selected ? 'bg-surface text-ink shadow-sm' : 'text-ink-2 hover:text-ink'
+                  }`}
+                >
+                  {kind === 'all' ? 'Todas' : ACCOUNT_KIND_LABELS[kind as AccountKind]}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
 
         <label className="block">
           <span className="label">Categoria</span>

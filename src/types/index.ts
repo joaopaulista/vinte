@@ -115,4 +115,6 @@ export interface TransactionFilters {
   from: string | null;
   to: string | null;
   search: string;
+  /** Natureza da conta (débito, crédito, dinheiro). Filtrado no app, não no banco. */
+  accountKind?: 'all' | 'debit' | 'credit' | 'cash';
 }
