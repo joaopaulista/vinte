@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, Building2, CreditCard, Landmark, Pencil, Plus, Users, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -291,7 +292,20 @@ function AccountSection({
               <p className={`num text-xl font-semibold ${credit ? 'text-danger-ink' : 'text-ink'}`}>
                 {formatCurrency(credit ? Math.abs(account.balance ?? 0) : account.balance)}
               </p>
-              <p className="mt-1 text-xs text-ink-3">Atualizada em {formatDate(account.updated_at.slice(0, 10))}</p>
+              <p className="mt-1 text-xs text-ink-3">
+                Atualizada em {formatDate(account.updated_at.slice(0, 10))}
+                {account.is_manual && (
+                  <>
+                    {' · '}
+                    <Link
+                      to={`/transacoes?lancar=${account.id}`}
+                      className="font-medium text-ink underline underline-offset-4 hover:text-accent"
+                    >
+                      Lançar
+                    </Link>
+                  </>
+                )}
+              </p>
               <OwnerSelect account={account} owners={owners} onChange={onChangeOwner} />
             </li>
           ))}

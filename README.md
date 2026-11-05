@@ -35,6 +35,7 @@ arquivos de `supabase/migrations/` **na ordem**:
 10. `0010_card_installments.sql` — guarda as parcelas das compras no cartão (6/8) para a previsão das faturas
 11. `0011_manual_accounts.sql` — contas manuais (dinheiro, contas sem Open Finance) com saldo calculado pelos lançamentos
 12. `0012_account_owners.sql` — responsáveis internos por conta (quem cuida de cada banco)
+13. `0013_manual_entries.sql` — lançamentos manuais (só em contas manuais)
 
 ### 2. Configurar as variáveis
 

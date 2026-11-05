@@ -81,6 +81,8 @@ export interface Transaction {
   total_installments: number | null;
   /** Data original da compra parcelada. */
   purchase_date: string | null;
+  /** Lançado à mão numa conta manual: pode ser editado e excluído (migration 0013). */
+  manual_entry: boolean;
   created_at: string;
 }
 

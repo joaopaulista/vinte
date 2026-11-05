@@ -13,7 +13,7 @@ const TRANSACTION_SELECT = `
   id, user_id, account_id, pluggy_transaction_id, description, amount,
   transaction_date, type, category_id, subcategory_id,
   reconciliation_status, reconciled_at, notes, auto_categorized, bill_payment,
-  installment_number, total_installments, purchase_date, created_at,
+  installment_number, total_installments, purchase_date, manual_entry, created_at,
   account:accounts!transactions_account_id_fkey (id, name, type, is_manual, owner_id),
   category:categories!transactions_category_id_fkey (id, name, color, icon),
   subcategory:categories!transactions_subcategory_id_fkey (id, name)
@@ -184,4 +184,63 @@ export async function importStatementLines(
 
   if (error) throw error;
   return lines.length;
+}
+
+export interface ManualEntryInput {
+  accountId: string;
+  description: string;
+  /** Negativo = saída, positivo = entrada. */
+  amount: number;
+  date: string;
+  categoryId: string | null;
+  subcategoryId: string | null;
+  notes: string | null;
+}
+
+/**
+ * Lançamento digitado pelo usuário numa conta manual. Entra aprovado: quem
+ * lança já disse o que é. O banco recalcula o saldo da conta (migration 0011)
+ * e recusa lançamento manual em conta do Open Finance (migration 0013).
+ */
+export async function createManualEntry(userId: string, input: ManualEntryInput): Promise<void> {
+  const { error } = await supabase.from('transactions').insert({
+    user_id: userId,
+    account_id: input.accountId,
+    description: input.description,
+    amount: input.amount,
+    transaction_date: input.date,
+    type: input.amount < 0 ? 'DEBIT' : 'CREDIT',
+    category_id: input.categoryId,
+    subcategory_id: input.subcategoryId,
+    notes: input.notes,
+    manual_entry: true,
+    reconciliation_status: 'approved',
+    reconciled_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function updateManualEntry(transactionId: string, input: ManualEntryInput): Promise<void> {
+  const { error } = await supabase
+    .from('transactions')
+    .update({
+      account_id: input.accountId,
+      description: input.description,
+      amount: input.amount,
+      transaction_date: input.date,
+      type: input.amount < 0 ? 'DEBIT' : 'CREDIT',
+      category_id: input.categoryId,
+      subcategory_id: input.subcategoryId,
+      notes: input.notes,
+      auto_categorized: false,
+    })
+    .eq('id', transactionId)
+    .eq('manual_entry', true);
+  if (error) throw error;
+}
+
+/** Só lançamentos manuais podem ser apagados: os do banco voltariam no próximo sync. */
+export async function deleteManualEntry(transactionId: string): Promise<void> {
+  const { error } = await supabase.from('transactions').delete().eq('id', transactionId).eq('manual_entry', true);
+  if (error) throw error;
 }

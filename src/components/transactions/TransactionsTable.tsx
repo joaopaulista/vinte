@@ -38,7 +38,10 @@ export function TransactionsTable({ transactions, renderActions }: TransactionsT
                   totalInstallments={transaction.total_installments}
                 />
                 {transaction.account?.name && (
-                  <p className="text-xs text-ink-3">{transaction.account.name}</p>
+                  <p className="text-xs text-ink-3">
+                    {transaction.account.name}
+                    {transaction.manual_entry && ' · lançamento manual'}
+                  </p>
                 )}
               </td>
               <td className="px-4 py-2.5">

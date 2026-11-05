@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
-import { ListOrdered, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ListOrdered, Pencil, Plus, RotateCcw } from 'lucide-react';
+import { ManualEntryDialog } from '@/components/transactions/ManualEntryDialog';
 import { TransactionFilters } from '@/components/transactions/TransactionFilters';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -11,8 +13,9 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { usePendingCount } from '@/contexts/PendingCountContext';
 import { reopenTransaction } from '@/services/transactionsService';
+import { fetchAccounts } from '@/services/accountsService';
 import { formatCurrency, formatDate } from '@/utils/format';
-import type { TransactionFilters as Filters, TransactionWithRelations } from '@/types';
+import type { AccountWithConnection, TransactionFilters as Filters, TransactionWithRelations } from '@/types';
 
 const EMPTY_FILTERS: Filters = {
   status: 'all',
@@ -23,7 +26,35 @@ const EMPTY_FILTERS: Filters = {
 };
 
 export default function Transactions() {
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // `?busca=` vem da pesquisa geral; `?lancar=<conta>` abre o lançamento manual.
+  const [filters, setFilters] = useState<Filters>(() => ({ ...EMPTY_FILTERS, search: searchParams.get('busca') ?? '' }));
+  const [manualAccounts, setManualAccounts] = useState<AccountWithConnection[]>([]);
+  // Lançamento aberto no diálogo: `null` = novo; `undefined` = fechado.
+  const [entry, setEntry] = useState<TransactionWithRelations | null | undefined>(
+    searchParams.has('lancar') ? null : undefined,
+  );
+  const defaultAccountId = searchParams.get('lancar');
+
+  useEffect(() => {
+    fetchAccounts()
+      .then((accounts) => setManualAccounts(accounts.filter((account) => account.is_manual)))
+      .catch(() => setManualAccounts([]));
+  }, []);
+
+  // A pesquisa geral pode mudar o termo com a página já aberta.
+  const searchParam = searchParams.get('busca');
+  useEffect(() => {
+    if (searchParam !== null) setFilters((current) => ({ ...current, search: searchParam }));
+  }, [searchParam]);
+
+  function closeEntry() {
+    setEntry(undefined);
+    if (searchParams.has('lancar')) {
+      searchParams.delete('lancar');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }
   // A busca é feita aqui, não no banco: precisa olhar campos que vêm de
   // outras tabelas (conta, categoria) e valores formatados ("231,45").
   const { search, ...serverFilters } = filters;
@@ -62,17 +93,26 @@ export default function Transactions() {
     <div className="page">
       <PageHeader
         title="Transações"
-        description="Todas as movimentações sincronizadas, em qualquer status."
+        description="Todas as movimentações, em qualquer status. Nas contas manuais, você lança à mão."
         actions={
-          !loading &&
-          !error &&
-          transactions.length > 0 && (
-            <dl className="flex flex-wrap gap-x-6 gap-y-1 text-right">
-              <SummaryTile label="Entradas no filtro" value={totals.income} tone="text-success-ink" />
-              <SummaryTile label="Saídas no filtro" value={totals.expense} tone="text-ink" />
-              <SummaryTile label="Resultado" value={totals.balance} tone="text-ink" />
-            </dl>
-          )
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+            {!loading && !error && transactions.length > 0 && (
+              <dl className="flex flex-wrap gap-x-6 gap-y-1 text-right">
+                <SummaryTile label="Entradas no filtro" value={totals.income} tone="text-success-ink" />
+                <SummaryTile label="Saídas no filtro" value={totals.expense} tone="text-ink" />
+                <SummaryTile label="Resultado" value={totals.balance} tone="text-ink" />
+              </dl>
+            )}
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setEntry(null)}
+              title="Lançar uma entrada ou saída numa conta manual"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Novo lançamento
+            </button>
+          </div>
         }
       />
 
@@ -100,7 +140,17 @@ export default function Transactions() {
           <TransactionsTable
             transactions={pagination.pageItems}
             renderActions={(transaction) =>
-              transaction.reconciliation_status === 'pending' ? null : (
+              transaction.manual_entry ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 transition hover:text-ink"
+                  onClick={() => setEntry(transaction)}
+                  title="Editar lançamento manual"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  Editar
+                </button>
+              ) : transaction.reconciliation_status === 'pending' ? null : (
                 <button
                   type="button"
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 transition hover:text-ink disabled:opacity-50"
@@ -117,6 +167,20 @@ export default function Transactions() {
 
           <Pagination state={pagination} noun="transações" />
         </>
+      )}
+
+      {entry !== undefined && (
+        <ManualEntryDialog
+          accounts={manualAccounts}
+          tree={tree}
+          transaction={entry}
+          defaultAccountId={defaultAccountId}
+          onClose={closeEntry}
+          onSaved={() => {
+            closeEntry();
+            void reload();
+          }}
+        />
       )}
     </div>
   );
