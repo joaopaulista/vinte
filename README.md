@@ -40,6 +40,7 @@ arquivos de `supabase/migrations/` **na ordem**:
 15. `0015_bill_payment_pairs.sql` — reconhece o pagamento de fatura pelo par (mesmo valor no cartão e na conta) e permite marcar à mão
 16. `0016_bank_pending.sql` — guarda transações ainda em aberto no banco (compras da fatura aberta do cartão)
 17. `0017_bill_payment_titles.sql` — reconhece pagamento de fatura por mais formas de título e limpa a fila
+18. `0018_installment_siblings.sql` — compra parcelada conciliada uma vez só; parcela lida do título ("PARC 03/05")
 
 ### 2. Configurar as variáveis
 

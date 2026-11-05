@@ -7,6 +7,7 @@ import { ImportStatementCard } from '@/components/reconciliation/ImportStatement
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { useTransactions } from '@/hooks/useTransactions';
+import { groupInstallments } from '@/utils/installments';
 import { useCategories } from '@/hooks/useCategories';
 import { usePagination } from '@/hooks/usePagination';
 import { Pagination } from '@/components/common/Pagination';
@@ -58,10 +59,14 @@ export default function Reconciliation() {
   const activeRef = useRef<HTMLDivElement>(null);
   const loadedOnce = useRef(false);
 
-  const queue = useMemo(
-    () => transactions.filter((transaction) => !resolvedIds.has(transaction.id)),
+  // Compra parcelada aparece uma vez: a parcela de menor número representa a
+  // compra e as outras são conciliadas junto com ela.
+  const grouped = useMemo(
+    () => groupInstallments(transactions.filter((transaction) => !resolvedIds.has(transaction.id))),
     [transactions, resolvedIds],
   );
+  const queue = grouped.visible;
+  const { siblingsOf } = grouped;
 
   // Busca por descrição, observação, valor ou data. Cada palavra precisa
   // aparecer em algum lugar: "edp 231" acha a conta de luz de R$ 231,45.
@@ -163,14 +168,16 @@ export default function Reconciliation() {
     });
 
     const next = neighbourOf(transaction.id);
-    setResolvedIds((current) => new Set(current).add(transaction.id));
+    // As outras parcelas da compra recebem a mesma decisão no banco.
+    const siblingIds = siblingsOf(transaction.id).map((sibling) => sibling.id);
+    setResolvedIds((current) => new Set([...current, transaction.id, ...siblingIds]));
     if (next) moveTo(next);
     const parent = tree.find((item) => item.id === categoryId);
     const child = parent?.children.find((item) => item.id === subcategoryId);
     const target = [parent?.name, child?.name].filter(Boolean).join(' › ');
     const name = splitDescription(transaction.description).name;
     setLastAction({
-      ids: [transaction.id],
+      ids: [transaction.id, ...siblingIds],
       message: status === 'approved' && target ? `Aprovada como ${target}: ${name}` : `Reprovada: ${name}`,
     });
     void refreshPendingCount();
@@ -194,7 +201,7 @@ export default function Reconciliation() {
           subcategoryId: selection.subcategoryId,
           notes: transaction.notes,
         });
-        done.push(transaction.id);
+        done.push(transaction.id, ...siblingsOf(transaction.id).map((sibling) => sibling.id));
         if (user && selection.categoryId) {
           void learnCategoryRule({
             userId: user.id,
@@ -436,6 +443,7 @@ export default function Reconciliation() {
                 <ReconciliationCard
                   key={active.id}
                   transaction={active}
+                  installmentSiblings={siblingsOf(active.id)}
                   tree={tree}
                   suggestion={suggestFor(active)}
                   focusOnMount={focusActive}

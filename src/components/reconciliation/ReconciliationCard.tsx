@@ -45,6 +45,8 @@ interface ReconciliationCardProps {
   focusOnMount?: boolean;
   onApprove: (categoryId: string, subcategoryId: string | null, notes: string) => Promise<void>;
   onReject: (notes: string) => Promise<void>;
+  /** Outras parcelas pendentes da mesma compra: vão junto na mesma decisão. */
+  installmentSiblings?: TransactionWithRelations[];
 }
 
 /**
@@ -59,6 +61,7 @@ export function ReconciliationCard({
   focusOnMount = false,
   onApprove,
   onReject,
+  installmentSiblings = [],
 }: ReconciliationCardProps) {
   const initial = initialSelection(transaction, suggestion);
   const [categoryId, setCategoryId] = useState(initial.categoryId);
@@ -159,6 +162,23 @@ export function ReconciliationCard({
             {formatCurrency(transaction.amount)}
           </p>
         </div>
+
+        {transaction.total_installments && transaction.total_installments > 1 && (
+          <p className="mt-4 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink-2">
+            Parcela{' '}
+            <strong className="num font-semibold text-ink">
+              {transaction.installment_number ?? '?'}/{transaction.total_installments}
+            </strong>{' '}
+            de uma compra parcelada.{' '}
+            {installmentSiblings.length > 0
+              ? `Conciliar esta concilia também ${
+                  installmentSiblings.length === 1 ? 'a parcela' : `as ${installmentSiblings.length} parcelas`
+                } ${installmentSiblings
+                  .map((sibling) => `${sibling.installment_number ?? '?'}/${sibling.total_installments}`)
+                  .join(', ')} que já chegaram. As próximas entram com a mesma decisão.`
+              : 'As próximas parcelas desta compra entram já conciliadas com a mesma decisão.'}
+          </p>
+        )}
 
         {untouched && initial.source && initial.source !== 'manual' && (
           <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-info-surface px-2.5 py-1 text-xs font-medium text-info-ink">
