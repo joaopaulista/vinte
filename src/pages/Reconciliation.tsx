@@ -13,7 +13,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingCount } from '@/contexts/PendingCountContext';
-import { markBillPayment, reconcileTransaction, reopenTransaction } from '@/services/transactionsService';
+import { reconcileTransaction, reopenTransaction } from '@/services/transactionsService';
 import { applyRulesToPending, learnCategoryRule } from '@/services/categoryRulesService';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { splitDescription } from '@/utils/merchant';
@@ -179,24 +179,6 @@ export default function Reconciliation() {
     if (status === 'approved' && categoryId && user) {
       void learnCategoryRule({ userId: user.id, description: transaction.description, categoryId, subcategoryId });
     }
-  }
-
-  /** Pagamento de fatura: sai da fila (com o outro lado do pagamento, se estiver nela). */
-  async function markAsBillPayment(transaction: TransactionWithRelations) {
-    const ids = await markBillPayment(transaction.id);
-    const next = filtered.find((candidate) => !ids.includes(candidate.id) && candidate.id !== transaction.id && filtered.indexOf(candidate) > filtered.indexOf(transaction))
-      ?? [...filtered].reverse().find((candidate) => !ids.includes(candidate.id) && candidate.id !== transaction.id);
-    setResolvedIds((current) => new Set([...current, transaction.id, ...ids]));
-    if (next) moveTo(next);
-    const name = splitDescription(transaction.description).name;
-    setLastAction({
-      ids: [transaction.id, ...ids.filter((id) => id !== transaction.id)],
-      message:
-        ids.length > 1
-          ? `Pagamento de fatura (e o outro lado dele) fora da fila: ${name}`
-          : `Pagamento de fatura fora da fila: ${name}`,
-    });
-    void refreshPendingCount();
   }
 
   async function approveReady() {
@@ -461,7 +443,6 @@ export default function Reconciliation() {
                     resolve(active, 'approved', categoryId, subcategoryId, notes)
                   }
                   onReject={(notes) => resolve(active, 'rejected', null, null, notes)}
-                  onBillPayment={() => markAsBillPayment(active)}
                 />
                 <p className="hidden flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2 sm:flex">
                   <span>

@@ -39,6 +39,7 @@ arquivos de `supabase/migrations/` **na ordem**:
 14. `0014_card_closing_day.sql` — fechamento e vencimento do cartão; compra depois do fechamento conta no mês seguinte
 15. `0015_bill_payment_pairs.sql` — reconhece o pagamento de fatura pelo par (mesmo valor no cartão e na conta) e permite marcar à mão
 16. `0016_bank_pending.sql` — guarda transações ainda em aberto no banco (compras da fatura aberta do cartão)
+17. `0017_bill_payment_titles.sql` — reconhece pagamento de fatura por mais formas de título e limpa a fila
 
 ### 2. Configurar as variáveis
 

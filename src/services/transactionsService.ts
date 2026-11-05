@@ -279,14 +279,3 @@ export async function searchTransactionsText(term: string, limit: number): Promi
   if (error) throw toError(error);
   return (data ?? []).map(normalizeTransaction);
 }
-
-/**
- * Marca como pagamento de fatura (reprovado, fora dos números) a transação e
- * o outro lado do pagamento, se houver (migration 0015). Devolve os ids
- * marcados.
- */
-export async function markBillPayment(transactionId: string): Promise<string[]> {
-  const { data, error } = await supabase.rpc('mark_bill_payment', { target: transactionId });
-  if (error) throw toError(error);
-  return (data ?? []) as string[];
-}
