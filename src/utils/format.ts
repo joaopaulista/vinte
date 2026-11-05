@@ -55,3 +55,19 @@ export function startOfMonth(date = new Date()): Date {
 export function monthsAgo(count: number, date = new Date()): Date {
   return new Date(date.getFullYear(), date.getMonth() - count, 1);
 }
+
+/**
+ * Lê um valor digitado em reais. Aceita "2.500,50", "1.500", "2500.50" e
+ * sinal na frente ("-30"). Devolve null quando não é um número.
+ */
+export function parseMoney(input: string): number | null {
+  const normalized = input.trim().replace(/\s|R\$/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+  if (normalized === '' || normalized === '-') return null;
+  const value = Number(normalized);
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+}
+
+/** Valor para preencher um campo: 1234.5 → "1234,50". */
+export function toMoneyInput(value: number): string {
+  return value.toFixed(2).replace('.', ',');
+}

@@ -33,6 +33,7 @@ arquivos de `supabase/migrations/` **na ordem**:
 8. `0008_keep_one_category.sql` — impede apagar a última categoria do usuário
 9. `0009_bill_payments.sql` — reconhece pagamento de fatura e reprova automaticamente (não conta em dobro)
 10. `0010_card_installments.sql` — guarda as parcelas das compras no cartão (6/8) para a previsão das faturas
+11. `0011_manual_accounts.sql` — contas manuais (dinheiro, contas sem Open Finance) com saldo calculado pelos lançamentos
 
 ### 2. Configurar as variáveis
 

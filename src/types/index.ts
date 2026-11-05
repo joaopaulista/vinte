@@ -28,12 +28,17 @@ export interface BankConnection {
 export interface Account {
   id: string;
   user_id: string;
-  bank_connection_id: string;
+  /** Nulo nas contas manuais (ver migration 0011). */
+  bank_connection_id: string | null;
   pluggy_account_id: string | null;
   name: string | null;
   type: string | null;
   balance: number | null;
   currency: string;
+  /** Conta cadastrada à mão (dinheiro, cofrinho…), fora do Open Finance. */
+  is_manual: boolean;
+  /** Só nas contas manuais: saldo = inicial + lançamentos não reprovados. */
+  initial_balance: number;
   updated_at: string;
   created_at: string;
 }
@@ -70,7 +75,7 @@ export interface Transaction {
 
 /** Transação com os relacionamentos que o app costuma exibir junto. */
 export interface TransactionWithRelations extends Transaction {
-  account: Pick<Account, 'id' | 'name' | 'type'> | null;
+  account: Pick<Account, 'id' | 'name' | 'type' | 'is_manual'> | null;
   category: Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
   subcategory: Pick<Category, 'id' | 'name'> | null;
 }

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, CreditCard, Landmark, Wallet } from 'lucide-react';
+import { Building2, CreditCard, Landmark, Pencil, Plus, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ConnectBankButton } from '@/components/accounts/ConnectBankButton';
+import { ManualAccountDialog } from '@/components/accounts/ManualAccountDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -18,6 +19,8 @@ export default function Accounts() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { refreshPendingCount } = usePendingCount();
+  // Conta manual aberta no diálogo: `null` cria uma nova; `undefined` = fechado.
+  const [editingManual, setEditingManual] = useState<AccountWithConnection | null | undefined>(undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,11 +62,19 @@ export default function Accounts() {
         title="Contas"
         description={
           <>
-            Bancos conectados via Open Finance, separados entre débito e crédito.
+            Bancos conectados via Open Finance e contas manuais, separados entre débito e crédito.
             {lastSyncLabel(connections)} Para atualizar, clique no logo do VINTE no menu.
           </>
         }
-        actions={<ConnectBankButton onConnected={afterSync} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary" onClick={() => setEditingManual(null)}>
+              <Plus className="h-4 w-4" aria-hidden />
+              Conta manual
+            </button>
+            <ConnectBankButton onConnected={afterSync} />
+          </div>
+        }
       />
 
       {notice && (
@@ -82,8 +93,8 @@ export default function Accounts() {
         <div className="card page-fill justify-center">
           <EmptyState
             icon={Wallet}
-            title="Nenhuma conta conectada"
-            description="Use 'Conectar banco' para abrir o Pluggy Connect. No ambiente Sandbox, escolha um conector de teste e use as credenciais de sandbox do Pluggy."
+            title="Nenhuma conta cadastrada"
+            description="Use 'Conectar banco' para abrir o Pluggy Connect, ou 'Conta manual' para registrar dinheiro em espécie e contas sem Open Finance."
           />
         </div>
       ) : (
@@ -95,6 +106,7 @@ export default function Accounts() {
             hint="Contas corrente e poupança: o saldo é o que você tem."
             accounts={debitAccounts}
             empty="Nenhuma conta de débito conectada."
+            onEditManual={setEditingManual}
           />
           <AccountSection
             icon={CreditCard}
@@ -114,6 +126,17 @@ export default function Accounts() {
           />
         </div>
       )}
+
+      {editingManual !== undefined && (
+        <ManualAccountDialog
+          account={editingManual}
+          onClose={() => setEditingManual(undefined)}
+          onSaved={() => {
+            setEditingManual(undefined);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -124,6 +147,9 @@ const TYPE_LABELS: Record<string, string> = {
   CREDIT_CARD: 'Cartão de crédito',
   BANK: 'Conta bancária',
   CREDIT: 'Crédito',
+  CASH: 'Dinheiro',
+  INVESTMENT: 'Investimento',
+  OTHER: 'Outra',
 };
 
 function isCreditAccount(account: AccountWithConnection): boolean {
@@ -139,6 +165,7 @@ function AccountSection({
   empty,
   summary,
   credit = false,
+  onEditManual,
 }: {
   icon: LucideIcon;
   title: string;
@@ -147,6 +174,7 @@ function AccountSection({
   empty: string;
   summary?: ReactNode;
   credit?: boolean;
+  onEditManual?: (account: AccountWithConnection) => void;
 }) {
   return (
     <section className="panel gap-3" aria-labelledby={`accounts-${title}`}>
@@ -172,8 +200,27 @@ function AccountSection({
           {accounts.map((account) => (
             <li key={account.id} className="rounded-xl border border-line p-4">
               <div className="flex items-center gap-2 text-sm text-ink-2">
-                <Building2 className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="truncate">{account.bank_connection?.institution_name ?? 'Instituição desconhecida'}</span>
+                {account.is_manual ? (
+                  <Wallet className="h-4 w-4 shrink-0" aria-hidden />
+                ) : (
+                  <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+                )}
+                <span className="min-w-0 flex-1 truncate">
+                  {account.is_manual
+                    ? 'Conta manual'
+                    : (account.bank_connection?.institution_name ?? 'Instituição desconhecida')}
+                </span>
+                {account.is_manual && onEditManual && (
+                  <button
+                    type="button"
+                    onClick={() => onEditManual(account)}
+                    className="-m-1 grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-3 transition hover:bg-surface-2 hover:text-ink"
+                    aria-label={`Editar conta ${account.name ?? ''}`}
+                    title="Editar conta manual"
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                )}
               </div>
               <p className="mt-2 truncate font-medium text-ink">{account.name ?? 'Conta'}</p>
               <p className="text-xs text-ink-3">
