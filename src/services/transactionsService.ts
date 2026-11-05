@@ -14,7 +14,7 @@ const TRANSACTION_SELECT = `
   transaction_date, type, category_id, subcategory_id,
   reconciliation_status, reconciled_at, notes, auto_categorized, bill_payment,
   installment_number, total_installments, purchase_date, created_at,
-  account:accounts!transactions_account_id_fkey (id, name, type, is_manual),
+  account:accounts!transactions_account_id_fkey (id, name, type, is_manual, owner_id),
   category:categories!transactions_category_id_fkey (id, name, color, icon),
   subcategory:categories!transactions_subcategory_id_fkey (id, name)
 `;

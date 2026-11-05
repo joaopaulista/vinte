@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, CreditCard, Landmark, Pencil, Plus, Wallet } from 'lucide-react';
+import { AlertTriangle, Building2, CreditCard, Landmark, Pencil, Plus, Users, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ConnectBankButton } from '@/components/accounts/ConnectBankButton';
 import { ManualAccountDialog } from '@/components/accounts/ManualAccountDialog';
 import { EmptyState } from '@/components/common/EmptyState';
+import { OwnerDot } from '@/components/owners/OwnerDot';
+import { OwnersDialog } from '@/components/owners/OwnersDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { fetchAccounts, fetchBankConnections } from '@/services/accountsService';
+import { setAccountOwner } from '@/services/ownersService';
 import { usePendingCount } from '@/contexts/PendingCountContext';
+import { useOwners } from '@/hooks/useOwners';
 import { formatCurrency, formatDate } from '@/utils/format';
-import type { AccountWithConnection, BankConnection, SyncResult } from '@/types';
+import type { AccountOwner, AccountWithConnection, BankConnection, SyncResult } from '@/types';
 
 export default function Accounts() {
   const [connections, setConnections] = useState<BankConnection[]>([]);
@@ -21,6 +25,8 @@ export default function Accounts() {
   const { refreshPendingCount } = usePendingCount();
   // Conta manual aberta no diálogo: `null` cria uma nova; `undefined` = fechado.
   const [editingManual, setEditingManual] = useState<AccountWithConnection | null | undefined>(undefined);
+  const { owners, reload: reloadOwners } = useOwners();
+  const [ownersOpen, setOwnersOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +61,21 @@ export default function Accounts() {
   const creditAccounts = accounts.filter(isCreditAccount);
   // No cartão, o saldo do Pluggy é o que está em aberto: a soma das faturas.
   const totalToPay = creditAccounts.reduce((sum, account) => sum + Math.abs(account.balance ?? 0), 0);
+  // Todo banco conectado precisa de um responsável (quando há responsáveis cadastrados).
+  const connectedWithoutOwner = accounts.filter((account) => !account.is_manual && !account.owner_id).length;
+
+  async function changeOwner(accountId: string, ownerId: string | null) {
+    const previous = accounts;
+    setAccounts((current) => current.map((account) => (account.id === accountId ? { ...account, owner_id: ownerId } : account)));
+    try {
+      await setAccountOwner(accountId, ownerId);
+    } catch (cause) {
+      setAccounts(previous);
+      setError(cause instanceof Error ? cause.message : 'Não foi possível trocar o responsável.');
+    }
+  }
+
+  const ownerProps = { owners, onChangeOwner: (id: string, ownerId: string | null) => void changeOwner(id, ownerId) };
 
   return (
     <div className="page">
@@ -68,6 +89,10 @@ export default function Accounts() {
         }
         actions={
           <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary" onClick={() => setOwnersOpen(true)}>
+              <Users className="h-4 w-4" aria-hidden />
+              Responsáveis
+            </button>
             <button type="button" className="btn-secondary" onClick={() => setEditingManual(null)}>
               <Plus className="h-4 w-4" aria-hidden />
               Conta manual
@@ -80,6 +105,25 @@ export default function Accounts() {
       {notice && (
         <div className="card shrink-0 border-success/30 bg-success-surface p-3 text-sm text-success-ink">
           {notice}
+        </div>
+      )}
+
+      {!loading && connectedWithoutOwner > 0 && (
+        <div className="card flex shrink-0 items-start gap-3 border-warn-ink/30 bg-warn-surface p-3 text-sm text-warn-ink">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p className="min-w-0 flex-1">
+            {connectedWithoutOwner === 1
+              ? '1 conta conectada está sem responsável.'
+              : `${connectedWithoutOwner} contas conectadas estão sem responsável.`}{' '}
+            {owners.length === 0
+              ? 'Cadastre os responsáveis e escolha quem cuida de cada banco.'
+              : 'Escolha quem cuida de cada banco no campo "Responsável" do card.'}
+          </p>
+          {owners.length === 0 && (
+            <button type="button" className="btn-secondary min-h-8 shrink-0 px-3 py-1 text-xs" onClick={() => setOwnersOpen(true)}>
+              Cadastrar
+            </button>
+          )}
         </div>
       )}
 
@@ -107,6 +151,7 @@ export default function Accounts() {
             accounts={debitAccounts}
             empty="Nenhuma conta de débito conectada."
             onEditManual={setEditingManual}
+            {...ownerProps}
           />
           <AccountSection
             icon={CreditCard}
@@ -123,8 +168,20 @@ export default function Accounts() {
               )
             }
             credit
+            {...ownerProps}
           />
         </div>
+      )}
+
+      {ownersOpen && (
+        <OwnersDialog
+          owners={owners}
+          accountCount={(ownerId) => accounts.filter((account) => account.owner_id === ownerId).length}
+          onClose={() => setOwnersOpen(false)}
+          onChanged={async () => {
+            await Promise.all([reloadOwners(), load()]);
+          }}
+        />
       )}
 
       {editingManual !== undefined && (
@@ -166,6 +223,8 @@ function AccountSection({
   summary,
   credit = false,
   onEditManual,
+  owners,
+  onChangeOwner,
 }: {
   icon: LucideIcon;
   title: string;
@@ -175,6 +234,8 @@ function AccountSection({
   summary?: ReactNode;
   credit?: boolean;
   onEditManual?: (account: AccountWithConnection) => void;
+  owners: AccountOwner[];
+  onChangeOwner: (accountId: string, ownerId: string | null) => void;
 }) {
   return (
     <section className="panel gap-3" aria-labelledby={`accounts-${title}`}>
@@ -231,11 +292,49 @@ function AccountSection({
                 {formatCurrency(credit ? Math.abs(account.balance ?? 0) : account.balance)}
               </p>
               <p className="mt-1 text-xs text-ink-3">Atualizada em {formatDate(account.updated_at.slice(0, 10))}</p>
+              <OwnerSelect account={account} owners={owners} onChange={onChangeOwner} />
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function OwnerSelect({
+  account,
+  owners,
+  onChange,
+}: {
+  account: AccountWithConnection;
+  owners: AccountOwner[];
+  onChange: (accountId: string, ownerId: string | null) => void;
+}) {
+  const owner = owners.find((candidate) => candidate.id === account.owner_id) ?? null;
+  const missing = !owner && !account.is_manual;
+  const id = `owner-${account.id}`;
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <label htmlFor={id} className="mb-1 flex items-center gap-1.5 text-xs text-ink-2">
+        <OwnerDot owner={owner} />
+        Responsável
+        {missing && <span className="font-medium text-warn-ink">· obrigatório</span>}
+      </label>
+      <select
+        id={id}
+        className={`field py-1.5 ${missing ? 'border-warn-ink/50' : ''}`}
+        value={account.owner_id ?? ''}
+        onChange={(event) => onChange(account.id, event.target.value || null)}
+        disabled={owners.length === 0}
+      >
+        <option value="">{owners.length === 0 ? 'Cadastre em "Responsáveis"' : 'Sem responsável'}</option>
+        {owners.map((candidate) => (
+          <option key={candidate.id} value={candidate.id}>
+            {candidate.name}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 

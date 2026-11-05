@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 import type { AccountWithConnection, BankConnection } from '@/types';
 
 const ACCOUNT_SELECT = `id, user_id, bank_connection_id, pluggy_account_id, name, type, balance, currency,
-  is_manual, initial_balance, updated_at, created_at,
+  is_manual, initial_balance, owner_id, updated_at, created_at,
   bank_connection:bank_connections!accounts_bank_connection_id_fkey (id, institution_name, status)`;
 
 export async function fetchAccounts(): Promise<AccountWithConnection[]> {

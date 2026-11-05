@@ -39,7 +39,18 @@ export interface Account {
   is_manual: boolean;
   /** Só nas contas manuais: saldo = inicial + lançamentos não reprovados. */
   initial_balance: number;
+  /** Responsável interno pela conta (ver migration 0012). */
+  owner_id: string | null;
   updated_at: string;
+  created_at: string;
+}
+
+/** Pessoa responsável por uma ou mais contas (ex.: cada um do casal). */
+export interface AccountOwner {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string | null;
   created_at: string;
 }
 
@@ -75,7 +86,7 @@ export interface Transaction {
 
 /** Transação com os relacionamentos que o app costuma exibir junto. */
 export interface TransactionWithRelations extends Transaction {
-  account: Pick<Account, 'id' | 'name' | 'type' | 'is_manual'> | null;
+  account: Pick<Account, 'id' | 'name' | 'type' | 'is_manual' | 'owner_id'> | null;
   category: Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
   subcategory: Pick<Category, 'id' | 'name'> | null;
 }
