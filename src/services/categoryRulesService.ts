@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, toError } from './supabaseClient';
 import { derivePattern } from '@/utils/merchant';
 
 /**
@@ -7,7 +7,7 @@ import { derivePattern } from '@/utils/merchant';
  */
 export async function applyRulesToPending(): Promise<number> {
   const { data, error } = await supabase.rpc('apply_rules_to_pending');
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data as number | null) ?? 0;
 }
 

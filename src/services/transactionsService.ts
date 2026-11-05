@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, toError } from './supabaseClient';
 import type {
   ReconciliationStatus,
   TransactionFilters,
@@ -73,7 +73,7 @@ async function fetchTransactionsPage(
   }
 
   const { data, error } = await query.range(offset, offset + size - 1);
-  if (error) throw error;
+  if (error) throw toError(error);
 
   // O PostgREST devolve os embeds como array quando não consegue inferir a
   // cardinalidade; normalizamos para objeto único.
@@ -86,7 +86,7 @@ export async function countPendingTransactions(): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('reconciliation_status', 'pending');
 
-  if (error) throw error;
+  if (error) throw toError(error);
   return count ?? 0;
 }
 
@@ -117,7 +117,7 @@ export async function reconcileTransaction(input: ReconcileInput): Promise<void>
     })
     .eq('id', input.transactionId);
 
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 /** Devolve uma transação já conciliada para a fila de pendentes. */
@@ -127,7 +127,7 @@ export async function reopenTransaction(transactionId: string): Promise<void> {
     .update({ reconciliation_status: 'pending', reconciled_at: null })
     .eq('id', transactionId);
 
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 type RawRelation<T> = T | T[] | null;
@@ -166,7 +166,7 @@ export async function fetchAccountEntries(
     .gte('transaction_date', from)
     .lte('transaction_date', to);
 
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data ?? []).map((row) => ({ ...row, amount: Number(row.amount) }));
 }
 
@@ -198,7 +198,7 @@ export async function importStatementLines(
     })),
   );
 
-  if (error) throw error;
+  if (error) throw toError(error);
   return lines.length;
 }
 
@@ -233,7 +233,7 @@ export async function createManualEntry(userId: string, input: ManualEntryInput)
     reconciliation_status: 'approved',
     reconciled_at: new Date().toISOString(),
   });
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 export async function updateManualEntry(transactionId: string, input: ManualEntryInput): Promise<void> {
@@ -252,13 +252,13 @@ export async function updateManualEntry(transactionId: string, input: ManualEntr
     })
     .eq('id', transactionId)
     .eq('manual_entry', true);
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 /** Só lançamentos manuais podem ser apagados: os do banco voltariam no próximo sync. */
 export async function deleteManualEntry(transactionId: string): Promise<void> {
   const { error } = await supabase.from('transactions').delete().eq('id', transactionId).eq('manual_entry', true);
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 /**
@@ -276,6 +276,6 @@ export async function searchTransactionsText(term: string, limit: number): Promi
     .or(`description.ilike.${pattern},notes.ilike.${pattern}`)
     .order('transaction_date', { ascending: false })
     .limit(limit);
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data ?? []).map(normalizeTransaction);
 }

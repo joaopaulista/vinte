@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, toError } from './supabaseClient';
 import type { AccountWithConnection, BankConnection } from '@/types';
 
 const ACCOUNT_SELECT = `id, user_id, bank_connection_id, pluggy_account_id, name, type, balance, currency,
@@ -11,7 +11,7 @@ export async function fetchAccounts(): Promise<AccountWithConnection[]> {
     .select(ACCOUNT_SELECT)
     .order('created_at', { ascending: true });
 
-  if (error) throw error;
+  if (error) throw toError(error);
 
   return (data ?? []).map((row) => {
     const { bank_connection: connection, ...rest } = row as Record<string, unknown> & {
@@ -33,7 +33,7 @@ export async function fetchBankConnections(): Promise<BankConnection[]> {
     .select('id, user_id, pluggy_item_id, institution_name, status, last_synced_at, created_at')
     .order('created_at', { ascending: true });
 
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data ?? []) as BankConnection[];
 }
 
@@ -61,7 +61,7 @@ export async function createManualAccount(userId: string, input: ManualAccountIn
     is_manual: true,
     initial_balance: input.balance,
   });
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 /**
@@ -83,11 +83,11 @@ export async function updateManualAccount(
     })
     .eq('id', account.id)
     .eq('is_manual', true);
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 /** Apaga a conta manual e, junto (cascade), os lançamentos dela. */
 export async function deleteManualAccount(accountId: string): Promise<void> {
   const { error } = await supabase.from('accounts').delete().eq('id', accountId).eq('is_manual', true);
-  if (error) throw error;
+  if (error) throw toError(error);
 }

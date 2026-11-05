@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, toError } from './supabaseClient';
 import type { Category, CategoryTree } from '@/types';
 
 const CATEGORY_COLUMNS = 'id, user_id, parent_category_id, name, icon, color, created_at';
@@ -10,7 +10,7 @@ export async function fetchCategories(): Promise<Category[]> {
     .select(CATEGORY_COLUMNS)
     .order('name', { ascending: true });
 
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data ?? []) as Category[];
 }
 
@@ -47,14 +47,14 @@ export async function createCategory(input: {
     .select(CATEGORY_COLUMNS)
     .single();
 
-  if (error) throw error;
+  if (error) throw toError(error);
   return data as Category;
 }
 
 export async function renameCategory(id: string, name: string): Promise<void> {
   const { error } = await supabase.from('categories').update({ name }).eq('id', id);
 
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 /**
@@ -64,13 +64,13 @@ export async function renameCategory(id: string, name: string): Promise<void> {
  */
 export async function deleteCategory(id: string): Promise<void> {
   const { error } = await supabase.from('categories').delete().eq('id', id);
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 /** Quantas transações usam a categoria (incluindo as subcategorias dela). */
 export async function getCategoryUsage(id: string): Promise<number> {
   const { data, error } = await supabase.rpc('category_usage', { target: id });
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data as number | null) ?? 0;
 }
 
@@ -88,6 +88,6 @@ export async function reassignAndDeleteCategory(input: {
     new_category: input.newCategoryId,
     new_subcategory: input.newSubcategoryId,
   });
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data as number | null) ?? 0;
 }

@@ -1,5 +1,5 @@
 import type { User } from '@supabase/supabase-js';
-import { supabase } from './supabaseClient';
+import { supabase, toError } from './supabaseClient';
 
 /**
  * Metas e limites do mês. Ficam nos metadados do usuário no Supabase Auth:
@@ -50,5 +50,5 @@ export async function saveGoals(goals: ExpenseGoal[]): Promise<void> {
   const { error } = await supabase.auth.updateUser({
     data: { [GOALS_KEY]: goals, [LEGACY_GOAL_KEY]: null },
   });
-  if (error) throw error;
+  if (error) throw toError(error);
 }

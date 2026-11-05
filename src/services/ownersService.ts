@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, toError } from './supabaseClient';
 import type { AccountOwner } from '@/types';
 
 /** Cores dos responsáveis, na ordem em que são cadastrados. */
@@ -11,7 +11,7 @@ export async function fetchOwners(): Promise<AccountOwner[]> {
     .from('account_owners')
     .select(OWNER_SELECT)
     .order('created_at', { ascending: true });
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data ?? []) as AccountOwner[];
 }
 
@@ -33,12 +33,12 @@ export async function renameOwner(ownerId: string, name: string): Promise<void> 
 /** As contas dele ficam sem responsável (FK com `on delete set null`). */
 export async function deleteOwner(ownerId: string): Promise<void> {
   const { error } = await supabase.from('account_owners').delete().eq('id', ownerId);
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 export async function setAccountOwner(accountId: string, ownerId: string | null): Promise<void> {
   const { error } = await supabase.from('accounts').update({ owner_id: ownerId }).eq('id', accountId);
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 function friendly(error: { code?: string; message: string }): Error {
